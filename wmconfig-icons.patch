@@ -20,7 +20,7 @@ diff -urN wmconfig-0.9.10/icewm.c wmconfig-0.9.10.new/icewm.c
  		    putchar('\t');
  		printf("prog \"%s\" %s ",
 -                       unicode_to_locale(app->name), app->__package);
-+                       unicode_to_locale(app->name), strcmp(app->icon,"")?app->icon:"\"\"");
++                       unicode_to_locale(app->name), app->icon?app->icon:"\"\"");
  					
                  /* this removes ending '&' that should not be there */
                  {
