@@ -1,0 +1,52 @@
+Binary files wmconfig-0.9.10.orig/.fvwm2.c.swp and wmconfig-0.9.10/.fvwm2.c.swp differ
+diff -urN wmconfig-0.9.10.orig/fvwm2.c wmconfig-0.9.10/fvwm2.c
+--- wmconfig-0.9.10.orig/fvwm2.c	Fri Nov  9 20:52:43 2001
++++ wmconfig-0.9.10/fvwm2.c	Fri Nov  9 21:01:21 2001
+@@ -34,6 +34,34 @@
+ extern unsigned int flags;
+ 
+ /*
++ * Copies given string to internal buffer and removes all %c style
++ * macros. fvwm2 doesnt support them and programs try to open files
++ * such as "%f".
++ */
++char *remove_percent(const char *s) {
++	static char *buf = NULL;
++	char *c;
++	int clean = 0;
++	if(buf)
++		free(buf);
++	buf = strdup(s);
++	c = buf;
++	while(*c) {
++		if(*c == '%')
++			clean = 1;
++		else if(*c == ' ')
++			clean = 0;
++
++		if(clean)
++			*c = ' ';
++
++		c++;
++	}
++
++	return buf;
++}
++
++/*
+  * Outputs on stdout the FVWM2-compatible configuration
+  */
+ static void fvwm2(const char *absolute_root_name, struct group *root, int level, const char *menu_name)
+@@ -102,10 +128,10 @@
+ 	    if (app->name && app->exec) {
+ 		if ((app->mini_icon != NULL) && !is_set(NO_MINI_ICONS))
+ 		    printf("AddToMenu\t%s%s\t\"%s %%%s%%\"\tExec exec\t%s\n",
+-			   menu_name, root_name, unicode_to_locale(app->name), app->mini_icon, app->exec);
++			   menu_name, root_name, unicode_to_locale(app->name), app->mini_icon, remove_percent(app->exec));
+ 		else
+ 		    printf("AddToMenu\t%s%s\t\"%s\"\tExec exec\t%s\n",
+-			   menu_name, root_name, unicode_to_locale(app->name), app->exec);
++			   menu_name, root_name, unicode_to_locale(app->name), remove_percent(app->exec));
+ 	    }
+ 	}
+ 	item++;
