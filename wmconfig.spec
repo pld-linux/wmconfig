@@ -11,7 +11,7 @@ Summary(pt_BR):	Configurador de gerenciadores de janelas
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.10
-Release:	11
+Release:	12
 License:	GPL
 Group:		X11/Window Managers/Tools
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
@@ -32,6 +32,7 @@ BuildRequires:	automake
 BuildRequires:	glib-devel
 %{!?_without_gnome:BuildRequires:	gnome-libs-static}
 BuildRequires:	zlib-devel
+Requires:	applnk
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %define 	_prefix		/usr/X11R6
