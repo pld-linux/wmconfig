@@ -15,6 +15,7 @@ Release:	14
 License:	GPL
 Group:		X11/Window Managers/Tools
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
+# Source0-md5:	e7974f13aa1f6c539b316d90ea81b5ae
 Source1:	%{name}-README.PLD
 Patch0:		%{name}-am_ac.patch
 Patch1:		%{name}-GNOME_path.patch
