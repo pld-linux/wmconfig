@@ -1,6 +1,6 @@
 #
 # Conditional build:
-# _without_gnome - with minimal gnome-libs fragment instead of libgnome.a
+# _with_gnome - without minimal gnome-libs fragment instead of libgnome.a
 #
 Summary:	Window Manager Configurator
 Summary(de):	Window Manager Configurator
@@ -34,7 +34,7 @@ URL:		http://www.arrishq.org/
 BuildRequires:	autoconf
 BuildRequires:	automake
 BuildRequires:	glib-devel
-%{!?_without_gnome:BuildRequires:	gnome-libs-static}
+%{?_with_gnome:BuildRequires:	gnome-libs-static}
 BuildRequires:	zlib-devel
 BuildRequires:	popt-static
 Requires:	applnk
@@ -80,8 +80,8 @@ IceWM, KDE, WindowMaker.
 %patch8 -p1
 %patch9 -p1
 %patch10 -p0
-%{?_without_gnome:%patch11 -p1}
-%{?_without_gnome:%patch12 -p1}
+%{!?_with_gnome:%patch11 -p1}
+%{!?_with_gnome:%patch12 -p1}
 
 %build
 rm -f acinclude.m4 missing
