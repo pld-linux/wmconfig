@@ -1,0 +1,2686 @@
+diff -Nur wmconfig-0.9.10.orig/Makefile.am wmconfig-0.9.10/Makefile.am
+--- wmconfig-0.9.10.orig/Makefile.am	Sat Nov 23 20:35:07 2002
++++ wmconfig-0.9.10/Makefile.am	Sat Nov 23 21:29:09 2002
+@@ -13,7 +13,7 @@
+ man_MANS	= wmconfig.1
+ 
+ if HAVE_GNOME
+-EXTRA_FILES	= input-gnome.c
++EXTRA_FILES	= input-gnome.c gnome-util.c gnome-i18n.c gnome-config.c gnome-dentry.c
+ EXTRA_INCLUDES	= @GNOME_INCS@
+ EXTRA_LIBS      = @GNOME_LIBS@
+ else
+diff -Nur wmconfig-0.9.10.orig/configure.in wmconfig-0.9.10/configure.in
+--- wmconfig-0.9.10.orig/configure.in	Sat Nov 23 20:35:07 2002
++++ wmconfig-0.9.10/configure.in	Sat Nov 23 21:14:37 2002
+@@ -23,8 +23,8 @@
+ 	yes)
+ 	    have_gnome=true
+ 	    AC_DEFINE(HAVE_GNOME)
+-	    GNOME_INCS="`gnome-config --cflags gnome`"
+-	    GNOME_LIBS="/usr/X11R6/lib/libgnome.a -lglib -lpopt"
++	    GNOME_INCS="-I/usr/include/glib-1.2 -I/usr/lib/glib/include"
++	    GNOME_LIBS="-lglib -lpopt"
+ 	    AC_SUBST(GNOME_INCS)
+ 	    AC_SUBST(GNOME_LIBS)
+ 	    ;;
+diff -Nur wmconfig-0.9.10.orig/gnome-config.c wmconfig-0.9.10/gnome-config.c
+--- wmconfig-0.9.10.orig/gnome-config.c	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-config.c	Sat Nov 23 21:37:46 2002
+@@ -0,0 +1,1127 @@
++/*
++ * Configuration-File Functions.
++ *
++ *  Copyright 1993, 1994, 1997 The Free Software Foundation
++ *
++ * Authors: Miguel de Icaza
++
++   This program is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Library General Public License
++   as published by the Free Software Foundation; either version 2 of
++   the License, or (at your option) any later version.
++   
++   The Gnome Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Library General Public License for more details.
++
++   You should have received a copy of the GNU Library General Public
++   License along with the Gnome Library; see the file COPYING.LIB.  If not,
++   write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++   Boston, MA 02111-1307, USA.  */
++
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>	/* unlink() */
++#include <stdlib.h>	/* atoi() */
++#include <locale.h>	/* setlocale() */
++#include <ctype.h>	/* tolower() */
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <errno.h>
++#include <glib.h>
++#include "gnome-config.h"
++#include "gnome-i18nP.h"
++#include "gnome-util.h"
++
++#include <string.h>
++
++#if !defined getc_unlocked && !defined HAVE_GETC_UNLOCKED
++# define getc_unlocked(fp) getc (fp)
++#endif
++
++#define STRSIZE 4096
++#define overflow (next == &CharBuffer [STRSIZE-1])
++
++enum {
++	FirstBrace,
++	OnSecHeader,
++	IgnoreToEOL,
++	IgnoreToEOLFirst,
++	KeyDef,
++	KeyDefOnKey,
++	KeyValue
++};
++
++typedef struct {
++	int type;
++	void *value;
++} iterator_type;
++
++typedef enum {
++	LOOKUP,
++	SET
++} access_type;
++
++typedef struct TKeys {
++	char *key_name;
++	char *value;
++	struct TKeys *link;
++} TKeys;
++
++typedef struct TSecHeader {
++	char *section_name;
++	TKeys *keys;
++	struct TSecHeader *link;
++} TSecHeader;
++
++typedef struct TProfile {
++	char *filename;
++	time_t last_checked;
++	time_t mtime;
++	gboolean written_to;
++	gboolean to_be_deleted;
++	TSecHeader *section;
++	struct TProfile *link;
++} TProfile;
++
++/*
++ * Prefix for all the configuration operations
++ * iff the path does not begin with / or with #
++ */
++
++#define prefix (prefix_list ? prefix_list->data : NULL)
++
++static GSList *prefix_list = NULL;
++
++static TProfile *Current = 0;
++
++/*
++ * This one keeps track of all of the opened files
++ */
++static TProfile *Base = 0;
++
++/* The `release_path' and `parsed_path' routines are inside the
++   following file.  It is in a separate file to allow the test-suite
++   to get at it, without needing to export special symbols.
++
++   typedef struct {
++	char *file, *section, *key, *def;
++	char *path, *opath;
++   } ParsedPath;
++
++   static void release_path (ParsedPath *p);
++   static ParsedPath *parse_path (const char *path, gint priv); */
++#include "parse-path.cP"
++
++static void 
++free_keys (TKeys *p)
++{
++	if (!p)
++		return;
++	free_keys (p->link);
++	g_free (p->key_name);
++	g_free (p->value);
++	g_free (p);
++}
++
++static void 
++free_sections (TSecHeader *p)
++{
++	if (!p)
++		return;
++	free_sections (p->link);
++	free_keys (p->keys);
++	g_free (p->section_name);
++	p->link = 0;
++	p->keys = 0;
++	g_free (p);
++}
++
++static int 
++is_loaded (const char *filename, TSecHeader **section)
++{
++	TProfile *p = Base;
++	TProfile *lastp = NULL;
++	struct stat st;
++	
++	/*
++	 * if the last one we accessed was this one we don't want to
++	 * search
++	 */
++	if (Current && strcasecmp (filename, Current->filename) == 0){
++		if (Current->last_checked != time (NULL)){
++			if (stat (filename, &st) == -1)
++				st.st_mtime = 0;
++			if (Current->mtime != st.st_mtime) {
++				free_sections (Current->section);
++				Current->section = NULL;
++				Current->filename[0] = '\0';
++				Current->written_to = TRUE;
++				Current->to_be_deleted = FALSE;
++				Current = NULL;
++				return 0;
++			}
++			Current->last_checked = time (NULL);
++		}
++		*section = Current->section;
++		return 1;
++	}
++	
++	while (p){
++		/*search and destroy empty nodes*/
++		if (p->filename[0]=='\0') {
++			TProfile *next = p->link;
++			if(lastp)
++				lastp->link = next;
++			else /*the next one is the first one actually*/
++				Base = next;
++			g_free(p->filename);
++			g_free(p);
++			p = next;
++		} else if (strcasecmp (filename, p->filename) == 0){
++			if (p->last_checked != time (NULL)){
++				if (stat (filename, &st) == -1)
++					st.st_mtime = 0;
++				if (p->mtime != st.st_mtime) {
++					if(p == Current)
++						Current = NULL;
++					free_sections (p->section);
++					p->section = NULL;
++					p->filename[0] = '\0';
++					p->written_to = TRUE;
++					p->to_be_deleted = FALSE;
++					return 0;
++				}
++				p->last_checked = time (NULL);
++			}
++			Current = p;
++			*section = p->section;
++			return 1;
++		} else {
++			lastp = p;
++			p = p->link;
++		}
++	}
++	return 0;
++}
++
++static char *
++decode_string_and_dup (char *s)
++{
++	char *p = g_malloc (strlen (s) + 1);
++	char *q = p;
++
++	do {
++		if (*s == '\\'){
++			switch (*(++s)){
++			case 'n':
++				*p++ = '\n';
++				break;
++			case '\\':
++				*p++ = '\\';
++				break;
++			case 'r':
++				*p++ = '\r';
++				break;
++			default:
++				*p++ = '\\';
++				*p++ = *s;
++			}
++		} else
++			*p++ = *s;
++	} while (*s++);
++	return q;
++}
++
++static TSecHeader *
++load (const char *file)
++{
++	FILE *f;
++	int state;
++	TSecHeader *SecHeader = 0;
++	char CharBuffer [STRSIZE];
++	char *next = "";		/* Not needed */
++	int c;
++	
++	if ((f = fopen (file, "r"))==NULL)
++		return NULL;
++	
++	state = FirstBrace;
++	while ((c = getc_unlocked (f)) != EOF){
++		if (c == '\r')		/* Ignore Carriage Return */
++			continue;
++		
++		switch (state){
++			
++		case OnSecHeader:
++			if (c == ']' || overflow){
++				*next = '\0';
++				next = CharBuffer;
++				SecHeader->section_name = g_strdup (CharBuffer);
++				state = IgnoreToEOL;
++			} else
++				*next++ = c;
++			break;
++
++		case IgnoreToEOL:
++		case IgnoreToEOLFirst:
++			if (c == '\n'){
++				if (state == IgnoreToEOLFirst)
++					state = FirstBrace;
++				else
++					state = KeyDef;
++				next = CharBuffer;
++			}
++			break;
++
++		case FirstBrace:
++		case KeyDef:
++		case KeyDefOnKey:
++			if (c == '#') {
++				if (state == FirstBrace)
++					state = IgnoreToEOLFirst;
++				else
++					state = IgnoreToEOL;
++				break;
++			}
++
++			if (c == '[' && state != KeyDefOnKey){
++				TSecHeader *temp;
++		
++				temp = SecHeader;
++				SecHeader = (TSecHeader *) g_malloc (sizeof (TSecHeader));
++				SecHeader->link = temp;
++				SecHeader->keys = 0;
++				state = OnSecHeader;
++				next = CharBuffer;
++				break;
++			}
++			/* On first pass, don't allow dangling keys */
++			if (state == FirstBrace)
++				break;
++	    
++			if ((c == ' ' && state != KeyDefOnKey) || c == '\t')
++				break;
++	    
++			if (c == '\n' || overflow) { /* Abort Definition */
++				next = CharBuffer;
++				state = KeyDef;
++                                break;
++                        }
++	    
++			if (c == '=' || overflow){
++				TKeys *temp;
++
++				temp = SecHeader->keys;
++				*next = '\0';
++				SecHeader->keys = (TKeys *) g_malloc (sizeof (TKeys));
++				SecHeader->keys->link = temp;
++				SecHeader->keys->key_name = g_strdup (CharBuffer);
++				state = KeyValue;
++				next = CharBuffer;
++			} else {
++				*next++ = c;
++				state = KeyDefOnKey;
++			}
++			break;
++
++		case KeyValue:
++			if (overflow || c == '\n'){
++				*next = '\0';
++				SecHeader->keys->value = decode_string_and_dup (CharBuffer);
++				state = c == '\n' ? KeyDef : IgnoreToEOL;
++				next = CharBuffer;
++#ifdef GNOME_ENABLE_DEBUG
++#endif
++			} else
++				*next++ = c;
++			break;
++	    
++		} /* switch */
++	
++	} /* while ((c = getc_unlocked (f)) != EOF) */
++	if (c == EOF && state == KeyValue){
++		*next = '\0';
++		SecHeader->keys->value = decode_string_and_dup (CharBuffer);
++	}
++	fclose (f);
++	return SecHeader;
++}
++
++static void 
++new_key (TSecHeader *section, const char *key_name, const char *value)
++{
++	TKeys *key;
++    
++	key = (TKeys *) g_malloc (sizeof (TKeys));
++	key->key_name = g_strdup (key_name);
++	key->value   = g_strdup (value);
++	key->link = section->keys;
++	section->keys = key;
++}
++
++static const char *
++access_config (access_type mode, const char *section_name,
++	       const char *key_name, const char *def, const char *filename,
++	       gboolean *def_used)
++{
++    
++	TProfile   *New;
++	TSecHeader *section;
++	TKeys      *key;
++
++	if (def_used)
++		*def_used = FALSE;
++	if (!is_loaded (filename, &section)){
++		struct stat st;
++		
++		if (stat (filename, &st) == -1)
++			st.st_mtime = 0;
++
++		New = (TProfile *) g_malloc (sizeof (TProfile));
++		New->link = Base;
++		New->filename = g_strdup (filename);
++		New->section = load (filename);
++		New->mtime = st.st_mtime;
++		New->written_to = FALSE;
++		New->to_be_deleted = FALSE;
++		New->last_checked = time (NULL);
++		Base = New;
++		section = New->section;
++		Current = New;
++	}
++    
++	/* Start search */
++	for (; section; section = section->link){
++		/*if section name empty or deleted or not the one we're
++		  looking for, then search on*/
++		if (!section->section_name ||
++		    !*section->section_name ||
++		    strcasecmp (section->section_name, section_name))
++			continue;
++		
++		for (key = section->keys; key; key = key->link){
++			if (strcasecmp (key->key_name, key_name))
++				continue;
++			if (mode == SET){
++				g_free (key->value);
++				key->value = g_strdup (def);
++				Current->written_to = TRUE;
++			}
++			return key->value;
++		}
++
++		/* No key found */
++		if (mode == SET){
++			new_key (section, key_name, def);
++			Current->written_to = TRUE;
++			return 0;
++		}
++	}
++    
++	/* Non existent section */
++	if ((mode == SET) && def){
++		section = (TSecHeader *) g_malloc (sizeof (TSecHeader));
++		section->section_name = g_strdup (section_name);
++		section->keys = 0;
++		new_key (section, key_name, def);
++		section->link = Current->section;
++		Current->section = section;
++		Current->written_to = TRUE;
++	} 
++	if (def_used)
++		*def_used = TRUE;
++	return def;
++}
++
++/* an extended version of access_config for looking up values in ~/.gnome.
++ * For writes it falls through to the standard behaviour.
++ * For lookups, it first checks for the value in
++ * $(datadir)/gnome/config-override, and if it isn't there in ~/.gnome,
++ * then checks $(datadir)/gnome/config, and as a last fallback uses def.
++ * This gives system administrators high level control over the default
++ * configuration values for GNOME
++ *
++ * Note that it doesn't really make sense to have system wide defaults for
++ * ~/.gnome_private data (IMHO), so I haven't addressed it in this
++ * interface. It probably isn't suitable for absolute config file names */
++static const char *
++access_config_extended (access_type mode, const char *section_name,
++			const char *key_name, const char *def,
++			const char *rel_file, gboolean *def_used)
++{
++	char *tmp, *filename;
++	const char *ret_val;
++	gboolean internal_def;
++
++	static time_t cache_time = 0;
++	static char *cache_filename = NULL;
++	static char *cache_overrride_filename = NULL;
++	static char *cache_global_filename = NULL;
++	gboolean cache_valid;
++	time_t now;
++        
++	switch (mode) {
++	case SET:
++		/* fall through to normal behaviour */
++		filename = gnome_util_home_file (rel_file);
++		ret_val = access_config (mode, section_name, key_name, def,
++					 filename, def_used);
++		g_free(filename);
++ 		cache_time = 0;  /* Invalidate cache.  */
++		return ret_val;
++	case LOOKUP:
++ 		now = time (NULL);
++ 		cache_valid = (cache_filename &&
++ 			       strcmp (cache_filename, rel_file) == 0 &&
++ 			       now - cache_time <= 2);
++ 		if (!cache_valid) {
++ 			if (cache_filename) 
++				g_free (cache_filename);
++
++ 			cache_filename = g_strdup (rel_file);
++ 			cache_time = now;
++
++ 			if (cache_overrride_filename)
++				g_free (cache_overrride_filename);
++
++ 			tmp = g_concat_dir_and_file ("gnome/config-override",rel_file);
++ 			filename = gnome_config_file (tmp);
++ 			g_free (tmp);
++ 			cache_overrride_filename = filename ? g_strdup (filename) : NULL;
++			
++ 			if (cache_global_filename)
++				g_free (cache_global_filename);
++
++			tmp = g_concat_dir_and_file ("gnome/config", rel_file);
++			filename = gnome_config_file (tmp);
++			g_free (tmp);
++			cache_global_filename = filename ? g_strdup (filename) : NULL;
++ 		}
++
++		if (cache_overrride_filename) {
++			/* the required config file exists */
++			ret_val = access_config (mode, section_name, key_name,
++						 NULL,
++						 cache_overrride_filename,
++						 &internal_def);
++			if (!internal_def) {
++				if (def_used)
++					*def_used = FALSE;
++				return ret_val;
++			}
++			g_assert (ret_val == NULL);
++		}
++
++		/* fall through to the user config section */
++		filename = gnome_util_home_file (rel_file);
++		ret_val = access_config (mode, section_name, key_name, NULL,
++					 filename, &internal_def);
++		g_free (filename);
++		if (!internal_def) {
++			if (def_used) 
++				*def_used = FALSE;
++			return ret_val;
++		}
++		g_assert (ret_val == NULL);
++
++		/* fall through to the system wide config default tree */
++		if (cache_global_filename) {
++			/* the file exists */
++			ret_val = access_config (mode, section_name, key_name,
++						 def,
++						 cache_global_filename,
++						 def_used);
++			return ret_val;
++		} else {
++			/* it doesn't -- use the default value */
++			if (def_used) 
++				*def_used = TRUE;
++			return def;
++		}
++	}
++	g_assert_not_reached ();
++
++	/* keep the compiler happy */
++	if (def_used) 
++		*def_used = TRUE;
++	return def;
++}
++
++/**
++ * gnome_config_drop_file: 
++ * @path: A gnome-config path
++ *
++ * Releases any memory resources that were allocated from accessing
++ * the configuration file in @path.  Changes will take place after
++ * #gnome_config_sync has been invoked
++ */
++/**
++ * gnome_config_private_drop_file:
++ * @path: A gnome-config path
++ *
++ * Releases any memory resources that were allocated from accessing the
++ * private configuration file in @path.
++ */
++void 
++_gnome_config_drop_file (const char *path, gint priv)
++{
++	TProfile *p;
++	TProfile *last;
++	ParsedPath *pp;
++	char *fake_path;
++	
++	if (!path)
++		return;
++
++	fake_path = g_concat_dir_and_file (path, "section/key");
++	pp = parse_path (fake_path, priv);
++	g_free (fake_path);
++
++	Current = NULL;
++	
++	for (last = NULL,p = Base; p; last = p, p = p->link){
++		if (strcmp (pp->file, p->filename) != 0)
++			continue;
++		
++		if(last)
++			last->link = p->link;
++		else
++			Base = p->link;
++		
++		free_sections (p->section);
++		g_free(p->filename);
++		g_free(p);
++		release_path (pp);
++		return;
++	}
++	release_path (pp);
++}
++
++/**
++ * gnome_config_init_iterator:
++ * @path: A gnome configuration path for a section.
++ *
++ * Creates an iterator handle that can be used to
++ * iterate over the keys in a section in a gnome configuration
++ * file.  @path must refer to a section.  The returned value
++ * can be used as an iterator for #gnome_config_iterator_next().
++ *
++ * Returns the iterator handle.
++ */
++/**
++ * gnome_config_private_init_iterator:
++ * @path: A gnome configuration path for a section.
++ *
++ * Creates an iterator handle that can be used to
++ * iterate over the keys in a section in a private gnome configuration
++ * file.  @path must refer to a section.  The returned value
++ * can be used as an iterator for #gnome_config_iterator_next().
++ *
++ * Returns the iterator handle.
++ */
++void *
++_gnome_config_init_iterator (const char *path, gint priv)
++{
++	TProfile   *New;
++	TSecHeader *section;
++	ParsedPath *pp;
++	char *fake_path;
++	iterator_type *iter;
++
++
++	fake_path = g_concat_dir_and_file (path, "key");
++	pp = parse_path (fake_path, priv);
++	g_free (fake_path);
++	
++	if (!is_loaded (pp->file, &section)){
++		struct stat st;
++		
++		if (stat (pp->file, &st) == -1){
++			st.st_mtime = 0;
++		}
++
++		New = (TProfile *) g_malloc (sizeof (TProfile));
++		New->link = Base;
++		New->filename = g_strdup (pp->file);
++		New->section = load (pp->file);
++		New->mtime = st.st_mtime;
++		New->last_checked = time (NULL);
++		New->written_to = FALSE;
++		New->to_be_deleted = FALSE;
++		Base = New;
++		section = New->section;
++		Current = New;
++	}
++	for (; section; section = section->link){
++		if (strcasecmp (section->section_name, pp->section))
++			continue;
++		iter = g_new (iterator_type, 1);
++		iter->type = 0;
++		iter->value = section->keys;
++		release_path (pp);
++		return iter;
++	}
++	release_path (pp);
++	return 0;
++}
++
++
++/**
++ * gnome_config_iterator_next:
++ * @iterator_handle: A gnome configu iterator handle, returned from any
++ *                   iteration start routine or this routine.
++ * @key:   Address where the key gets stored.
++ * @value: Address where the value gets stored.
++ *
++ *
++ * Returns a new iterator handle.
++ *
++ * If @key is non-NULL, then @key will point to a g_malloc()ed region that
++ * holds the key.
++ *
++ * If @value is non-NULL, then @value will point to a g_malloc()ed region that
++ * holds the key.
++ *
++ */
++void *
++gnome_config_iterator_next (void *iterator_handle, char **key, char **value)
++{
++	iterator_type *iter = iterator_handle;
++
++        /*
++	 * g_return_if_fail is not appropriate since this is not
++	 * really a failure, but passing in an "empty" iterator (we
++	 * return NULL at times)
++	 */
++	if(!iterator_handle)
++		return NULL; 
++
++	if (key)
++		*key = NULL;
++	if (value)
++		*value = NULL;
++	
++	if (iter->type == 0){
++		TKeys *keys;
++		keys = iter->value;
++		if (keys){
++			if (key)
++				*key   = g_strdup (keys->key_name);
++			if (value)
++				*value = g_strdup (keys->value);
++			keys   = keys->link;
++			iter->value = keys;
++			return iter;
++		} else {
++			g_free (iter);
++			return 0;
++		}
++	} else {
++		TSecHeader *section;
++		section = iter->value;
++
++		if (section){
++			if (key)
++				*key = g_strdup (section->section_name);
++			section = section->link;
++			iter->value = section;
++			return iter;
++		} else {
++			g_free (iter);
++			return 0;
++		}
++	}
++}
++
++/**
++ * gnome_config_get_translated_string:
++ * @path: A gnome configuration path to an item.
++ *
++ * Retrieves & returns the value of a configuration item as a string
++ * appropriate for the current language. The returned value should be
++ * g_free()'d when no longer needed.
++ */
++/**
++ * gnome_config_private_get_translated_string:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ *
++ * Retrieves & returns the value of a configuration item as a string appropriate for the current language. The returned value should be
++ * g_free()'d when no longer needed.
++ * The item is retrieved from the user's private configuration storage area.
++ */
++/**
++ * gnome_config_get_translated_string_with_default:
++ * @path: A gnome configuration path to an item.
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a string appropriate for the current language. The returned value should be
++ * g_free()'d when no longer needed.
++ */
++/**
++ * gnome_config_private_get_translated_string_with_default:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a string appropriate for the current language. The returned value should be
++ * g_free()'d when no longer needed.
++ * The item is retrieved from the user's private configuration storage area.
++ */
++char *
++_gnome_config_get_translated_string_with_default (const char *path,
++						  gboolean *def,
++						  gint priv)
++{
++	GList *language_list;
++
++	char *value= NULL;
++
++	language_list = gnome_i18n_get_language_list ("LC_MESSAGES");
++
++	while (!value && language_list) {
++		const char *lang= language_list->data;
++		gchar *tkey;
++
++		tkey = g_strconcat (path, "[", lang, "]", NULL);
++		value = _gnome_config_get_string_with_default (tkey, def, priv);
++		g_free (tkey);
++
++		if (!value || *value == '\0') {
++			size_t n;
++
++			g_free (value);
++			value= NULL;
++
++			/* Sometimes the locale info looks
++			   like `pt_PT@verbose'.  In this case
++			   we want to try `pt' as a backup.  */
++			n = strcspn (lang, "@_");
++			if (lang[n]) {
++				char *copy = g_strndup (lang, n);
++				tkey = g_strconcat (path, "[",
++						    copy, "]",
++						    NULL);
++				value = _gnome_config_get_string_with_default (tkey, def, priv);
++				g_free (tkey);
++				g_free (copy);
++				if (! value || *value == '\0') {
++					g_free (value);
++					value = NULL;
++				}
++			}
++		}
++		language_list = language_list->next;
++	}
++
++	if (!value){
++		value = _gnome_config_get_string_with_default (path, def, priv);
++
++		if (!value || *value == '\0'){
++			g_free (value);
++			value = NULL;
++		}
++	}
++	return value;
++}
++
++/**
++ * gnome_config_get_string:
++ * @path: A gnome configuration path to an item.
++ *
++ * Retrieves & returns the value of a configuration item as a string.
++ * The returned value should be
++ * g_free()'d when no longer needed.
++ */
++/**
++ * gnome_config_private_get_string:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ *
++ * Retrieves & returns the value of a configuration item as a
++ * string. The returned value should be g_free()'d when no longer
++ * needed.  The item is retrieved from the user's private
++ * configuration storage area.
++ */
++/**
++ * gnome_config_get_string_with_default:
++ * @path: A gnome configuration path to an item.
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a string.
++ * The returned value should be g_free()'d when no longer needed.
++ *
++ */
++/**
++ * gnome_config_private_get_string_with_default:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a string.
++ * The returned value should be g_free()'d when no longer needed.  The
++ * item is retrieved from the user's private configuration storage
++ * area.
++ *
++ */
++char *
++_gnome_config_get_string_with_default (const char *path, gboolean *def,
++				       gint priv)
++{
++	ParsedPath *pp;
++	const char *r;
++	char *ret = NULL;
++	
++	pp = parse_path (path, priv);
++	if (!priv && pp->opath[0] != '=')
++		r = access_config_extended (LOOKUP, pp->section, pp->key,
++					    pp->def, pp->path, def);
++	else
++		r = access_config (LOOKUP, pp->section, pp->key, pp->def,
++				   pp->file, def);
++	if (r)
++		ret = g_strdup (r);
++	release_path (pp);
++	return ret;
++}
++
++/**
++ * gnome_config_get_bool:
++ * @path: A gnome configuration path to an item.
++ *
++ * Retrieves & returns the value of a configuration item as a boolean.
++ */
++/**
++ * gnome_config_private_get_bool:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ *
++ * Retrieves & returns the value of a configuration item as a boolean.
++ * The item is retrieved from the user's private configuration storage area.
++ */
++/**
++ * gnome_config_get_bool_with_default:
++ * @path: A gnome configuration path to an item.
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a boolean.
++ */
++/**
++ * gnome_config_private_get_bool_with_default:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a boolean.
++ * The item is retrieved from the user's private configuration storage area.
++ */
++gboolean
++_gnome_config_get_bool_with_default (const char *path, gboolean *def,
++				     gint priv)
++{
++	ParsedPath *pp;
++	const char *r;
++	int  v;
++	
++	pp = parse_path (path, priv);
++	if (!priv && pp->opath[0] != '=')
++		r = access_config_extended (LOOKUP, pp->section, pp->key,
++					    pp->def, pp->path, def);
++	else
++		r = access_config (LOOKUP, pp->section, pp->key, pp->def,
++				   pp->file, def);
++
++	/* It isn't an error if the key is not found.  */
++	if (r == NULL){
++		release_path (pp);
++		return 0;
++	}
++
++	if (tolower(*r) == 't' || tolower(*r) == 'y' || atoi(r)) {
++		v = 1;
++	} else {
++		/* If it's not true it has to be false :) */
++		v = 0;
++	}
++	release_path (pp);
++	return v;
++}
++
++/**
++ * gnome_config_make_vector:
++ * @string: The stringified vector to decode into 'argcp' and 'argvp'
++ * @argcp: Returns the number of elements in 'argvp'
++ * @argvp: Returns the array of strings found in 'rr'.
++ *
++ * Creates a new vector from a string as it stored in the config file,
++ * breaks the string on spaces except if the space is escaped with a
++ * backslash.
++ *
++ */
++void
++gnome_config_make_vector (const char *string, int *argcp, char ***argvp)
++{
++	char *p;
++	int count, esc_spcs;
++	int space_seen;
++
++	/* Figure out how large to make return vector.  Start at 2
++	 * because we want to make NULL-terminated array, and because
++	 * the loop doesn't count the final element.
++	 */
++	count = 2;
++	space_seen = 0;
++	for (p = (char *) string; *p; ++p) {
++	        if (*p == '\\' && *(p+1)) {
++			++p;
++			if (space_seen){
++				count++;
++				space_seen = 0;
++			}
++		} else if (*p == ' ') {
++			space_seen = 1;
++		} else if (space_seen){
++			count++;
++			space_seen = 0;
++		}
++	}
++
++	*argcp = count - 1;
++	*argvp = (char **) g_malloc0 (count * sizeof (char *));
++
++	p = (char *) string;
++	count = 0;
++	do {
++		char *s, *tmp = p;
++
++		esc_spcs = 0;
++		while (*p && (esc_spcs ? 1 : (*p != ' '))){
++			esc_spcs = 0;
++			if (*p == '\\')
++				esc_spcs = 1;
++			p++;
++		}
++
++ 		s = (char *) g_strndup (tmp, p - tmp);
++
++		(*argvp)[count++] = tmp = s;
++
++		while (*s) {
++			if (*s == '\\') 
++				s++;				
++			if (!*s) break;
++			*tmp++ = *s++;
++		}
++		*tmp = '\0';
++
++		while (*p && *p == ' ')
++			p++;
++	} while (*p);
++}
++
++/**
++ * gnome_config_get_vector:
++ * @path: A gnome configuration path to an item.
++ * @argcp: Number of elements in the vector
++ * @argvp: Vector of strings
++ *
++ * Retrieves & returns the value of a configuration item as a string array.
++ * The returned value should be
++ * g_free()'d when no longer needed.
++ */
++/**
++ * gnome_config_private_get_vector:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ * @argcp: Number of elements in the vector
++ * @argvp: Vector of strings
++ *
++ * Retrieves & returns the value of a configuration item as a
++ * string. The returned value should be g_free()'d when no longer
++ * needed.  The item is retrieved from the user's private
++ * configuration storage area.
++ */
++/**
++ * gnome_config_get_vector_with_default:
++ * @path: A gnome configuration path to an item.
++ * @argcp: Number of elements in the vector
++ * @argvp: Vector of strings
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a string array.
++ * The returned value should be g_free()'d when no longer needed.
++ *
++ */
++/**
++ * gnome_config_private_get_vector_with_default:
++ * @path: A gnome configuration path to an item in the user-private namespace.
++ * @argcp: Number of elements in the vector
++ * @argvp: Vector of strings
++ * @def: A pointer to a flag that will be set if the default value for the item
++ * is returned.
++ *
++ * Retrieves & returns the value of a configuration item as a string array.
++ * The returned value should be g_free()'d when no longer needed.  The
++ * item is retrieved from the user's private configuration storage
++ * area.
++ *
++ */
++void
++_gnome_config_get_vector_with_default (const char *path, int *argcp,
++				       char ***argvp, gboolean *def, gint priv)
++{
++	ParsedPath *pp;
++	const char *rr;
++	
++	pp = parse_path (path, priv);
++	if (!priv && pp->opath[0] != '=')
++		rr = access_config_extended (LOOKUP, pp->section, pp->key,
++					     pp->def, pp->path, def);
++	else
++		rr = access_config (LOOKUP, pp->section, pp->key, pp->def,
++				    pp->file, def);
++
++	if (rr == NULL) {
++		*argvp = NULL;
++		*argcp = 0;
++	} else
++		gnome_config_make_vector (rr, argcp, argvp);
++	release_path (pp);
++}
++
++/**
++ * gnome_config_push_prefix:
++ * @path: a gnome configuration path prefix
++ *
++ * @path is a prefix that will be prepended automatically to any
++ * non-absolute configuration path in gnome config.
++ *
++ * This is used to simplify application loading code.
++ *
++ * Library code will usually have to set the prefix before doing
++ * any gnome-configuration access, since the application might
++ * be using their own prefix. 
++ */
++void
++gnome_config_push_prefix (const char *path)
++{
++	prefix_list = g_slist_prepend(prefix_list, g_strdup(path));
++}
++
++/**
++ * gnome_config_pop_prefix:
++ *
++ * Call this routine to remove the current configuration prefix from the stack.
++ */
++void
++gnome_config_pop_prefix (void)
++{
++	if(prefix_list) {
++		GSList *plist = prefix_list;
++		g_free(prefix_list->data);
++		prefix_list = prefix_list->next;
++		g_slist_free_1(plist);
++	}
++}
+diff -Nur wmconfig-0.9.10.orig/gnome-config.h wmconfig-0.9.10/gnome-config.h
+--- wmconfig-0.9.10.orig/gnome-config.h	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-config.h	Sat Nov 23 21:04:03 2002
+@@ -0,0 +1,129 @@
++#ifndef GNOME_CONFIG_H
++#define GNOME_CONFIG_H
++
++#include <glib.h>
++
++/* Prototypes for the profile management functions */
++
++/*
++ * DOC: gnome configuration routines.
++ *
++ * All of the routines receive a pathname, the pathname has the following
++ * form:
++ *
++ *      /filename/section/key[=default]
++ *
++ * This format reprensents: a filename relative to the Gnome config
++ * directory called filename (ie, ~/.gnome/filename), in that file there
++ * is a section called [section] and key is the left handed side of the
++ * values.
++ *
++ * If default is provided, it cane be used to return a default value
++ * if none is specified on the config file.
++ *
++ * Examples:
++ * 
++ * /gmix/Balance/Ratio=0.5
++ * /filemanager/Panel Display/html=1
++ *
++ * If the pathname starts with '=', then instead of being a ~/.gnome relative
++ * file, it is an abolute pathname, example:
++ *
++ * =/home/miguel/.mc.ini=/Left Panel/reverse=1
++ *
++ * This reprensents the config file: /home/miguel/.mc.ini, section [Left Panel],
++ * variable reverse.
++ */
++
++/* These functions look for the config option named in PATH.  If the
++   option does not exist, and a default is specified in PATH, then the
++   default will be returned.  In all cases, *DEF is set to 1 if the
++   default was return, 0 otherwise.  If DEF is NULL then it will not
++   be set.  */
++
++/*use the wrappers below*/
++char *_gnome_config_get_string_with_default    (const char *path,
++					        gboolean *def,
++						gint priv);
++char *_gnome_config_get_translated_string_with_default(const char *path,
++						       gboolean *def,
++						       gint priv);
++gboolean _gnome_config_get_bool_with_default   (const char *path,
++					        gboolean *def,
++					        gint priv);
++void _gnome_config_get_vector_with_default     (const char *path, gint *argcp,
++					        char ***argvp,
++					        gboolean *def,
++					        gint priv);
++
++/*these just call the above functions, but devide them into two groups,
++  in the future these may be different functions, so use these defines*/
++/*normal functions*/
++#define gnome_config_get_string_with_default(path,def) \
++	(_gnome_config_get_string_with_default((path),(def),FALSE))
++#define gnome_config_get_translated_string_with_default(path,def) \
++	(_gnome_config_get_translated_string_with_default((path),(def),FALSE))
++#define gnome_config_get_bool_with_default(path,def) \
++	(_gnome_config_get_bool_with_default((path),(def),FALSE))
++#define gnome_config_get_vector_with_default(path, argcp, argvp, def) \
++        (_gnome_config_get_vector_with_default ((path),(argcp),(argvp), \
++						(def),FALSE))
++
++/*private functions*/
++#define gnome_config_private_get_string_with_default(path,def) \
++	(_gnome_config_get_string_with_default((path),(def),TRUE))
++#define gnome_config_private_get_translated_string_with_default(path,def) \
++	(_gnome_config_get_translated_string_with_default((path), (def),TRUE))
++#define gnome_config_private_get_bool_with_default(path,def) \
++	(_gnome_config_get_bool_with_default((path),(def),TRUE))
++#define gnome_config_private_get_vector_with_default(path, argcp, argvp, def) \
++        (_gnome_config_get_vector_with_default ((path),(argcp), (argvp), \
++        					(def), TRUE))
++
++/* Convenience wrappers for the case when you don't care if you see
++   the default.  */
++/*normal functions*/
++#define gnome_config_get_string(path) \
++	(_gnome_config_get_string_with_default ((path), NULL, FALSE))
++#define gnome_config_get_translated_string(path) \
++	(_gnome_config_get_translated_string_with_default ((path), NULL, FALSE))
++#define gnome_config_get_bool(path) \
++	(_gnome_config_get_bool_with_default ((path), NULL, FALSE))
++#define gnome_config_get_vector(path, argcp, argvp) \
++        (_gnome_config_get_vector_with_default ((path), (argcp), (argvp), \
++        					NULL, FALSE))
++
++/*private functions*/
++#define gnome_config_private_get_string(path) \
++	(_gnome_config_get_string_with_default ((path), NULL, TRUE))
++#define gnome_config_private_get_translated_string(path) \
++	(_gnome_config_get_translated_string_with_default ((path), NULL, TRUE))
++#define gnome_config_private_get_bool(path) \
++	(_gnome_config_get_bool_with_default ((path), NULL, TRUE))
++#define gnome_config_private_get_vector(path, argcp, argvp) \
++        (_gnome_config_get_vector_with_default ((path), (argcp), (argvp), \
++        					NULL, TRUE))
++
++/* Returns a pointer for iterating on /file/section contents */
++void *_gnome_config_init_iterator (const char *path, gint priv);
++#define gnome_config_init_iterator(path) \
++	(_gnome_config_init_iterator((path),FALSE))
++#define gnome_config_private_init_iterator(path) \
++	(_gnome_config_init_iterator((path),TRUE))
++
++/* Get next key and value value from a section */
++void *gnome_config_iterator_next (void *iterator_handle, char **key, char **value);
++
++/* This routine drops the information about /file, meaning changes
++   done to this file will be dropped, it will no delete the file */
++void _gnome_config_drop_file     (const char *path, gint priv);
++#define gnome_config_drop_file(path) \
++	(_gnome_config_drop_file((path),FALSE))
++#define gnome_config_private_drop_file(path) \
++	(_gnome_config_drop_file((path),TRUE))
++
++/* Set an active prefix and remove an active prefix */
++void gnome_config_push_prefix (const char *path);
++void gnome_config_pop_prefix (void);
++
++#endif
+diff -Nur wmconfig-0.9.10.orig/gnome-dentry.c wmconfig-0.9.10/gnome-dentry.c
+--- wmconfig-0.9.10.orig/gnome-dentry.c	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-dentry.c	Sat Nov 23 21:40:25 2002
+@@ -0,0 +1,657 @@
++/*
++ * Support for manipulating .desktop files
++ *
++ * (C) 1997, 1999 the Free Software Foundation
++ *
++ * Authors: Miguel de Icaza
++ *          Federico Mena
++ */
++
++#include <config.h>
++#include <glib.h>
++#include <sys/stat.h>
++#include <string.h>
++#include <stdio.h>
++#include <stdlib.h>
++#ifdef __GLIBC__
++#include <locale.h>
++#include <iconv.h>
++#include <langinfo.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <unistd.h>
++#endif
++#include "gnome-util.h"
++#include "gnome-config.h"
++#include "gnome-dentry.h"
++
++#define KDE_ICONDIR "/usr/X11R6/share/pixmaps"
++
++#ifdef __GLIBC__
++static char *utf8tolocalechar (const char *value);
++static gboolean file_looks_utf8 (const char *filename);
++#endif
++
++/* g_free already checks if x is NULL */
++#define free_if_empty(x) g_free (x)
++
++/* find language in a list of GnomeDesktopEntryI18N's*/
++static GnomeDesktopEntryI18N *
++find_lang(GList *list, char *lang)
++{
++	for(;list;list=list->next) {
++		GnomeDesktopEntryI18N *e = list->data;
++		if((!lang && !e->lang) ||
++		   (lang && e->lang && strcmp(e->lang,lang)==0)) {
++			return e;
++		}
++	}
++	return NULL;
++}
++
++/* add a comment or name to a language list */
++static GList *
++add_comment_or_name(GList *list, char *lang, char *name, char *comment)
++{
++	GnomeDesktopEntryI18N *entry;
++	
++	entry = find_lang(list,lang);
++	if(!entry) {
++		entry = g_new0(GnomeDesktopEntryI18N,1);
++		entry->lang = g_strdup(lang);
++		list = g_list_prepend(list,entry);
++	}
++	
++	if(name) {
++		if(entry->name)
++			g_free(entry->name);
++		entry->name = g_strdup(name);
++	}
++	if(comment) {
++		if(entry->comment)
++			g_free(entry->comment);
++		entry->comment = g_strdup(comment);
++	}
++	return list;
++}
++
++/*get the lang out of key, (modifies key!) */
++#define GET_LANG(lang,key,len) 				\
++	if(key[len]=='[') {				\
++		char *p = strchr(&key[(len)+1],']');	\
++		if(p) {					\
++			*p = '\0';			\
++			lang = &key[(len)+1];		\
++		}					\
++	}
++
++/*read the names and comments from the desktop file*/
++static GList *
++read_names_and_comments(const char *file, int is_kde)
++{
++	GList *i18n_list = NULL;
++	
++	gpointer iterator;
++	char *key,*value;
++	char *prefix;
++	
++	gnome_config_push_prefix ("");
++	if(!is_kde) {
++		prefix = g_strconcat ("=", file, "=/Desktop Entry", NULL);
++	} else {
++		prefix = g_strconcat ("=", file, "=/KDE Desktop Entry", NULL);
++	}
++	iterator = gnome_config_init_iterator(prefix);
++	g_free(prefix);
++	gnome_config_pop_prefix ();
++	/*it HAS to be there*/
++	g_assert(iterator);
++	while ((iterator = gnome_config_iterator_next(iterator, &key, &value))) {
++		if(strncmp(key,"Name",4)==0) {
++			char *lang = NULL;
++			GET_LANG(lang,key,4)
++			i18n_list = add_comment_or_name(i18n_list,lang,value,NULL);
++		} else if(strncmp(key,"Comment",7)==0) {
++			char *lang = NULL;
++			GET_LANG(lang,key,7)
++			i18n_list = add_comment_or_name(i18n_list,lang,NULL,value);
++		}
++		g_free(key);
++		g_free(value);
++	}
++	return i18n_list;
++}
++
++/**
++ * gnome_desktop_entry_load_flags_conditional:
++ * @file: a file name that contains a desktop entry.
++ * @clean_from_memory_after_load: flag
++ * @unconditional: flag
++ *
++ * Returns a newly created desktop entry loaded from @file or NULL
++ * if the file does not exist.
++ *
++ * if @unconditional is TRUE then the desktop entry is loaded even if
++ * it contains stale data, otherwise, NULL is returned if stale data
++ * is found (like, the program referenced not existing).
++ *
++ * if @clean_from_memory_after_load is TRUE, then any data cached used by loading
++ * process is discarded after loading the desktop entry.
++ */
++GnomeDesktopEntry *
++gnome_desktop_entry_load_flags_conditional (const char *file,
++					    int clean_from_memory_after_load,
++					    int unconditional)
++{
++	GnomeDesktopEntry *newitem;
++	char *prefix;
++	char *name, *type;
++#ifdef __GLIBC__
++	char *comment;
++#endif
++	char *try_file;
++	char **exec_vector;
++	int exec_length;
++	char *icon_base;
++	char *p = NULL;
++	gboolean is_kde = FALSE;
++ 	gboolean is_dot_directory = FALSE;
++#ifdef __GLIBC__
++	gboolean is_utf8;
++#endif
++	GList *i18n_list = NULL;
++	
++	g_assert (file != NULL);
++#ifdef __GLIBC__
++	is_utf8 = file_looks_utf8 (file);
++#endif
++	prefix = g_strconcat ("=", file, "=/Desktop Entry/", NULL);
++	gnome_config_push_prefix (prefix);
++	g_free (prefix);
++
++	name = gnome_config_get_translated_string ("Name");
++	if (!name) {
++		gnome_config_pop_prefix ();
++
++		prefix = g_strconcat ("=", file, "=/KDE Desktop Entry/", NULL);
++		gnome_config_push_prefix (prefix);
++		g_free (prefix);
++
++		is_kde = TRUE;
++
++		name = gnome_config_get_translated_string ("Name");
++		if (!name) {
++			gnome_config_pop_prefix ();
++			return NULL;
++		}
++	}
++
++	/* FIXME: we only test for presence of Exec/TryExec keys if
++	 * the type of the desktop entry is not a Directory.  Since
++	 * Exec/TryExec may not make sense for other types of desktop
++	 * entries, we will later need to make this code smarter.
++	 */
++
++	if (strlen (file) >= strlen (".directory") &&
++	    strcmp (file + strlen (file) - strlen (".directory"), ".directory") == 0)
++		is_dot_directory = TRUE;
++	
++	type      = gnome_config_get_string (is_dot_directory ? "Type=Directory" : "Type");
++	gnome_config_get_vector ("Exec", &exec_length, &exec_vector);
++	try_file  = gnome_config_get_string ("TryExec");
++
++	if (!type || (strcmp (type, "Directory") != 0)){
++		if(!unconditional && ( !exec_vector || (try_file && !(p = gnome_is_program_in_path(try_file))))){
++			free_if_empty (p);
++			free_if_empty (name);
++			free_if_empty (type);
++			g_strfreev (exec_vector);
++			free_if_empty (try_file);
++			
++			gnome_config_pop_prefix ();
++			return NULL;
++		}
++		if (p)
++			g_free (p);
++	}
++	
++	newitem = g_new0 (GnomeDesktopEntry, 1);
++
++#ifdef __GLIBC__	
++	comment = gnome_config_get_translated_string ("Comment");
++	if (is_utf8) {
++		if (name) {
++			newitem->name = utf8tolocalechar (name);
++			g_free (name);
++		} else
++			newitem->name = NULL;
++
++		if (comment) {
++			newitem->comment = utf8tolocalechar (comment);
++			g_free (comment);
++		} else
++			newitem->comment = NULL;
++	} else {
++		newitem->name = name;
++		newitem->comment = comment;
++	}
++#else
++	newitem->name = name;
++	newitem->comment = gnome_config_get_translated_string ("Comment");
++#endif	
++	newitem->exec_length   = exec_length;
++	newitem->exec          = exec_vector;
++	newitem->tryexec       = try_file;
++	newitem->docpath       = gnome_config_get_string ("DocPath");
++	newitem->terminal      = gnome_config_get_bool   ("Terminal=0");
++	newitem->type          = type;
++	newitem->geometry      = gnome_config_get_string ("Geometry");
++	newitem->multiple_args = gnome_config_get_bool   ("MultipleArgs=0");
++	newitem->location      = g_strdup (file);
++	newitem->is_kde       =  is_kde;
++
++	icon_base              = gnome_config_get_string ("Icon");
++
++	if (icon_base && *icon_base) {
++		/* Sigh, now we need to make them local to the gnome install */
++		if (*icon_base != '/') {
++			if (newitem->is_kde) {
++				gchar *iconname = g_concat_dir_and_file (KDE_ICONDIR, icon_base);
++				if (g_file_exists (iconname))
++					newitem->icon = iconname;
++				else {
++					g_free (iconname);
++					newitem->icon = NULL;
++				}
++			} else {
++				newitem->icon = gnome_pixmap_file (icon_base);
++				/* If it wasn't found, look in kde */
++				if (!newitem->icon) {
++					gchar *iconname = g_concat_dir_and_file (KDE_ICONDIR "/hicolor/32x32/apps", icon_base);
++					if (g_file_exists (iconname))
++						newitem->icon = iconname;
++					else {	/* Maybe it didn't have an extension? */
++						gchar *icon2 = g_strconcat (iconname, ".png", NULL);
++						if (g_file_exists (icon2))
++							newitem->icon = icon2;
++						else
++							g_free (icon2);
++						g_free (iconname);
++					}
++				}
++			}
++			g_free (icon_base);
++		} else
++			newitem->icon = icon_base;
++	} else {
++		/*no icon*/
++		if(icon_base) g_free(icon_base);
++		newitem->icon = NULL;
++	}
++	
++	gnome_config_pop_prefix ();
++
++	/*get us the Names and comments of different languages*/
++	i18n_list = read_names_and_comments (file, is_kde);
++	gnome_desktop_entry_set_i18n_list (newitem, i18n_list);
++	
++	if (clean_from_memory_after_load) {
++		prefix = g_strconcat ("=", file, "=", NULL);
++		gnome_config_drop_file (prefix);
++		g_free (prefix);
++	}
++	
++	return newitem;
++}
++
++/**
++ * gnome_desktop_entry_load_flags:
++ * @file: a file name that contains a desktop entry.
++ * @clean_from_memory_after_load: flag
++ *
++ * Returns a newly created desktop entry loaded from @file or NULL
++ * if the file does not exist or contains stale data.
++ *
++ * if @clean_from_memory_after_load is TRUE, then any data cached used by loading
++ * process is discarded after loading the desktop entry.
++ */
++GnomeDesktopEntry *
++gnome_desktop_entry_load_flags (const char *file, int clean_from_memory_after_load)
++{
++	return gnome_desktop_entry_load_flags_conditional (file, clean_from_memory_after_load, FALSE);
++}
++
++/**
++ * gnome_desktop_entry_load:
++ * @file: a file name that contains a desktop entry.
++ *
++ * Returns a newly created desktop entry loaded from @file or NULL
++ * if the file does not exist or contains stale data.
++ */
++GnomeDesktopEntry *
++gnome_desktop_entry_load (const char *file)
++{
++	return gnome_desktop_entry_load_flags (file, 1);
++}
++
++/**
++ * gnome_desktop_entry_free:
++ * @item: a gnome desktop entry.
++ *
++ * Releases the information used by @item.
++ */
++void
++gnome_desktop_entry_free (GnomeDesktopEntry *item)
++{
++	if (item) {
++		free_if_empty (item->name);
++		free_if_empty (item->comment);
++		g_strfreev (item->exec);
++		free_if_empty (item->tryexec);
++		free_if_empty (item->icon);
++		free_if_empty (item->docpath);
++		free_if_empty (item->type);
++		free_if_empty (item->location);
++		free_if_empty (item->geometry);
++		gnome_desktop_entry_free_i18n_list (gnome_desktop_entry_get_i18n_list(item));
++		g_dataset_destroy (item);
++		g_free (item);
++	}
++}
++
++/**
++ * gnome_desktop_entry_get_i18n_list:
++ * @item: a GnomeDesktopEntry.
++ *
++ * Description: Gets a list of the GnomeDesktopEntryI18N structures
++ * with the translations for @item. It's the actual one that's stored
++ * with the entry, not a copy. If you modify it you need to do a
++ * #gnome_desktop_entry_set_i18n_list.
++ *
++ * Returns: A GList * of GnomeDesktopEntryI18N's
++ */
++GList *
++gnome_desktop_entry_get_i18n_list(GnomeDesktopEntry *item)
++{
++	return g_dataset_get_data(item,"i18n_list");
++}
++
++/**
++ * gnome_desktop_entry_set_i18n_list:
++ * @item: a GnomeDesktopEntry.
++ * @list: a list of GnomeDesktopEntryI18N's
++ *
++ * Description: Sets the list of translations associated with this
++ * particular entry to @list. It does not free the current one, so
++ * if you want to free that one use #gnome_desktop_entry_get_i18n_list
++ * and #gnome_desktop_entry_free_i18n_list, first. This is so that
++ * you can get the list with #gnome_desktop_entry_get_i18n_list, modify
++ * it and set it back.
++ *
++ * Returns:
++ */
++void
++gnome_desktop_entry_set_i18n_list(GnomeDesktopEntry *item, GList *list)
++{
++	g_dataset_set_data(item,"i18n_list",list);
++}
++
++/**
++ * gnome_desktop_entry_free_i18n_list:
++ * @list: a list of GnomeDesktopEntryI18N's
++ *
++ * Description: A utility function for freeing a GList of
++ * GnomeDesktopEntryI18N's.
++ *
++ * Returns:
++ */
++void
++gnome_desktop_entry_free_i18n_list(GList *list)
++{
++	GList *li;
++	for (li=list; li; li=li->next) {
++		GnomeDesktopEntryI18N *e = li->data;
++		free_if_empty (e->lang);
++		free_if_empty (e->name);
++		free_if_empty (e->comment);
++		g_free(e);
++	}
++	if(list) g_list_free(list);
++}
++
++#ifdef __GLIBC__
++static gboolean
++get_contents_regfile (const gchar *filename,
++                      struct stat *stat_buf,
++                      gint         fd,
++                      gchar      **contents,
++                      gsize       *length)
++{
++  gchar *buf;
++  size_t bytes_read;
++  size_t size;
++      
++  size = stat_buf->st_size;
++
++  buf = g_new (gchar, size + 1);
++      
++  bytes_read = 0;
++  while (bytes_read < size)
++    {
++      gssize rc;
++          
++      rc = read (fd, buf + bytes_read, size - bytes_read);
++
++      if (rc < 0)
++        {
++          if (errno != EINTR) 
++            {
++              close (fd);
++
++              g_free (buf);
++                  
++              return FALSE;
++            }
++        }
++      else if (rc == 0)
++        break;
++      else
++        bytes_read += rc;
++    }
++      
++  buf[bytes_read] = '\0';
++
++  if (length)
++    *length = bytes_read;
++  
++  *contents = buf;
++
++  close (fd);
++
++  return TRUE;
++}
++
++/* Cut and paste from Glib-2.0
++ */
++static gboolean
++g_file_get_contents (const gchar *filename,
++                     gchar      **contents,
++                     gsize       *length)
++{  
++  struct stat stat_buf;
++  gint fd;
++  
++  g_return_val_if_fail (filename != NULL, FALSE);
++  g_return_val_if_fail (contents != NULL, FALSE);
++
++  *contents = NULL;
++  if (length)
++    *length = 0;
++
++  fd = open (filename, O_RDONLY);
++
++  if (fd < 0)
++    return FALSE;
++
++  /* I don't think this will ever fail, aside from ENOMEM, but. */
++  if (fstat (fd, &stat_buf) < 0)
++    {
++      close (fd);
++      
++      return FALSE;
++    }
++
++  if (stat_buf.st_size > 0 && S_ISREG (stat_buf.st_mode))
++    {
++      return get_contents_regfile (filename,
++                                   &stat_buf,
++                                   fd,
++                                   contents,
++                                   length);
++    }
++  else
++    {
++      /* Glib-2.0 includes fallback to stdio in this case, but this shouldn't
++       * happen for desktop files
++       */
++
++      return FALSE;
++    }
++}
++
++#define F 0   /* character never appears in text */
++#define T 1   /* character appears in plain ASCII text */
++#define I 2   /* character appears in ISO-8859 text */
++#define X 3   /* character appears in non-ISO extended ASCII (Mac, IBM PC) */
++
++static char text_chars[256] = {
++	/*                  BEL BS HT LF    FF CR    */
++	F, F, F, F, F, F, F, T, T, T, T, F, T, T, F, F,  /* 0x0X */
++        /*                              ESC          */
++	F, F, F, F, F, F, F, F, F, F, F, T, F, F, F, F,  /* 0x1X */
++	T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T,  /* 0x2X */
++	T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T,  /* 0x3X */
++	T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T,  /* 0x4X */
++	T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T,  /* 0x5X */
++	T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T,  /* 0x6X */
++	T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, F,  /* 0x7X */
++	/*            NEL                            */
++	X, X, X, X, X, T, X, X, X, X, X, X, X, X, X, X,  /* 0x8X */
++	X, X, X, X, X, X, X, X, X, X, X, X, X, X, X, X,  /* 0x9X */
++	I, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I,  /* 0xaX */
++	I, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I,  /* 0xbX */
++	I, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I,  /* 0xcX */
++	I, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I,  /* 0xdX */
++	I, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I,  /* 0xeX */
++	I, I, I, I, I, I, I, I, I, I, I, I, I, I, I, I   /* 0xfX */
++};
++
++static gboolean
++file_looks_utf8 (const char *filename)
++{
++	int i, n;
++	unsigned long c;
++	char *buf;
++	size_t nbytes;
++	gboolean gotone = FALSE;
++	gboolean result = TRUE;
++
++	if (!g_file_get_contents (filename, &buf, &nbytes))
++		return FALSE;
++
++	for (i = 0; result && i < nbytes; i++) {
++		if ((buf[i] & 0x80) == 0) {	   /* 0xxxxxxx is plain ASCII */
++			/*
++			 * Even if the whole file is valid UTF-8 sequences,
++			 * still reject it if it uses weird control characters.
++			 */
++
++			if (text_chars[((guchar *)buf)[i]] != T)
++				result = FALSE;
++		} else if ((buf[i] & 0x40) == 0) { /* 10xxxxxx never 1st byte */
++			result = FALSE;
++		} else {			   /* 11xxxxxx begins UTF-8 */
++			int following;
++
++			if ((buf[i] & 0x20) == 0) {		/* 110xxxxx */
++				c = buf[i] & 0x1f;
++				following = 1;
++			} else if ((buf[i] & 0x10) == 0) {	/* 1110xxxx */
++				c = buf[i] & 0x0f;
++				following = 2;
++			} else if ((buf[i] & 0x08) == 0) {	/* 11110xxx */
++				c = buf[i] & 0x07;
++				following = 3;
++			} else if ((buf[i] & 0x04) == 0) {	/* 111110xx */
++				c = buf[i] & 0x03;
++				following = 4;
++			} else if ((buf[i] & 0x02) == 0) {	/* 1111110x */
++				c = buf[i] & 0x01;
++				following = 5;
++			} else {
++				result = FALSE;
++				goto done;
++			}
++
++			for (n = 0; n < following; n++) {
++				i++;
++				if (i >= nbytes) {
++					result = FALSE;
++					goto done;
++				}
++
++				if ((buf[i] & 0x80) == 0 || (buf[i] & 0x40)) {
++					result = FALSE;
++					goto done;
++				}
++
++				c = (c << 6) + (buf[i] & 0x3f);
++			}
++
++			gotone = TRUE;
++		}
++	}
++done:
++	g_free (buf);
++
++	return result && gotone;   /* don't claim it's UTF-8 if it's all 7-bit */
++}
++
++static char *
++utf8tolocalechar (const char *value)
++{
++	static gboolean initialized = FALSE;
++	static iconv_t fd = (iconv_t)-1;
++	
++	if (!initialized) {
++		gchar *locale;
++		
++		setlocale (LC_CTYPE, "");
++		locale = nl_langinfo (CODESET);
++
++		if (g_strcasecmp (locale, "utf8") != 0 && g_strcasecmp (locale, "utf8") != 0) {
++			fd = iconv_open (locale, "UTF-8");
++			if (fd == (iconv_t)-1) {
++				g_warning ("gnome-dentry.c: Cannot open converter from UTF-8 to locale");
++			}
++		}
++		
++		initialized = TRUE;
++	}
++	if (fd != (iconv_t)-1) {
++		gchar *pout, *pin, *str;
++		gint len, ib, ob;
++
++		len = strlen (value);
++
++		ib = len;
++		ob = ib * 3;
++		pout = str = g_new0 (gchar, ob);
++		pin = (char *)value;
++		iconv (fd, NULL, NULL, &pout, &ob);
++		iconv (fd, &pin, &ib, &pout, &ob);
++		return str;
++	} else
++	        return g_strdup (value);
++}
++#endif
+diff -Nur wmconfig-0.9.10.orig/gnome-dentry.h wmconfig-0.9.10/gnome-dentry.h
+--- wmconfig-0.9.10.orig/gnome-dentry.h	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-dentry.h	Sat Nov 23 21:32:16 2002
+@@ -0,0 +1,39 @@
++#ifndef __GNOME_DENTRY_H__
++#define __GNOME_DENTRY_H__
++
++#include <glib.h>
++
++typedef struct {
++	char *name;		/* These contain the translated name/comment */
++	char *comment;
++	int exec_length;	/* Length of `exec' vector.  Does not
++				   include the NULL terminator.  */
++	char **exec;		/* Command to execute.  Must be NULL
++				   terminated.  */
++	char *tryexec;		/* Test program to execute */
++	char *icon;		/* Icon name */
++	char *docpath;		/* Path to the documentation */
++	int   terminal;		/* flag: requires a terminal to run */
++	char *type;		/* type of this dentry */
++	char *location;		/* path of this dentry */
++	char *geometry;		/* geometry for this icon */
++	
++	unsigned int multiple_args:1;
++	unsigned int is_kde:1;  /* If this is a .kdelink file */
++} GnomeDesktopEntry;
++
++GnomeDesktopEntry *gnome_desktop_entry_load (const char *file);
++void gnome_desktop_entry_free (GnomeDesktopEntry *item);
++
++typedef struct _GnomeDesktopEntryI18N GnomeDesktopEntryI18N;
++struct _GnomeDesktopEntryI18N {
++	char *lang;
++	char *name;
++	char *comment;
++};
++
++GList * gnome_desktop_entry_get_i18n_list (GnomeDesktopEntry *item);
++void gnome_desktop_entry_set_i18n_list (GnomeDesktopEntry *item, GList *list);
++void gnome_desktop_entry_free_i18n_list (GList *list);
++
++#endif
+diff -Nur wmconfig-0.9.10.orig/gnome-i18n.c wmconfig-0.9.10/gnome-i18n.c
+--- wmconfig-0.9.10.orig/gnome-i18n.c	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-i18n.c	Sat Nov 23 21:36:31 2002
+@@ -0,0 +1,291 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <glib.h>
++
++/* Name of config key we use when looking up preferred language. */
++#define LANGKEY "/Gnome/i18n/LANG"
++
++static GHashTable *alias_table = NULL;
++
++/*read an alias file for the locales*/
++static void
++read_aliases (char *file)
++{
++  FILE *fp;
++  char buf[256];
++  if (!alias_table)
++    alias_table = g_hash_table_new (g_str_hash, g_str_equal);
++  fp = fopen (file,"r");
++  if (!fp)
++    return;
++  while (fgets (buf,sizeof (buf),fp))
++    {
++      char *p;
++      g_strstrip(buf);
++      if (buf[0]=='#' || buf[0]=='\0')
++        continue;
++      p = strtok (buf,"\t ");
++      if (!p)
++	continue;
++      p = strtok (NULL,"\t ");
++      if(!p)
++	continue;
++      if (!g_hash_table_lookup (alias_table, buf))
++	g_hash_table_insert (alias_table, g_strdup(buf), g_strdup(p));
++    }
++  fclose (fp);
++}
++
++/*return the un-aliased language as a newly allocated string*/
++static char *
++unalias_lang (char *lang)
++{
++  char *p;
++  if (!alias_table)
++    {
++      read_aliases ("/usr/share/locale/locale.alias");
++      read_aliases ("/usr/local/share/locale/locale.alias");
++      read_aliases ("/usr/lib/X11/locale/locale.alias");
++      read_aliases ("/usr/openwin/lib/locale/locale.alias");
++    }
++  while ((p=g_hash_table_lookup(alias_table,lang)) && strcmp(p, lang))
++      lang = p;
++  return lang;
++}
++
++/* Mask for components of locale spec. The ordering here is from
++ * least significant to most significant
++ */
++enum
++{
++  COMPONENT_CODESET =   1 << 0,
++  COMPONENT_TERRITORY = 1 << 1,
++  COMPONENT_MODIFIER =  1 << 2
++};
++
++/* Break an X/Open style locale specification into components
++ */
++static guint
++explode_locale (const gchar *locale,
++		gchar **language, 
++		gchar **territory, 
++		gchar **codeset, 
++		gchar **modifier)
++{
++  const gchar *uscore_pos;
++  const gchar *at_pos;
++  const gchar *dot_pos;
++
++  guint mask = 0;
++
++  uscore_pos = strchr (locale, '_');
++  dot_pos = strchr (uscore_pos ? uscore_pos : locale, '.');
++  at_pos = strchr (dot_pos ? dot_pos : (uscore_pos ? uscore_pos : locale), '@');
++
++  if (at_pos)
++    {
++      mask |= COMPONENT_MODIFIER;
++      *modifier = g_strdup (at_pos);
++    }
++  else
++    at_pos = locale + strlen (locale);
++
++  if (dot_pos)
++    {
++      mask |= COMPONENT_CODESET;
++      *codeset = g_new (gchar, 1 + at_pos - dot_pos);
++      strncpy (*codeset, dot_pos, at_pos - dot_pos);
++      (*codeset)[at_pos - dot_pos] = '\0';
++    }
++  else
++    dot_pos = at_pos;
++
++  if (uscore_pos)
++    {
++      mask |= COMPONENT_TERRITORY;
++      *territory = g_new (gchar, 1 + dot_pos - uscore_pos);
++      strncpy (*territory, uscore_pos, dot_pos - uscore_pos);
++      (*territory)[dot_pos - uscore_pos] = '\0';
++    }
++  else
++    uscore_pos = dot_pos;
++
++  *language = g_new (gchar, 1 + uscore_pos - locale);
++  strncpy (*language, locale, uscore_pos - locale);
++  (*language)[uscore_pos - locale] = '\0';
++
++  return mask;
++}
++
++/*
++ * Compute all interesting variants for a given locale name -
++ * by stripping off different components of the value.
++ *
++ * For simplicity, we assume that the locale is in
++ * X/Open format: language[_territory][.codeset][@modifier]
++ *
++ * TODO: Extend this to handle the CEN format (see the GNUlibc docs)
++ *       as well. We could just copy the code from glibc wholesale
++ *       but it is big, ugly, and complicated, so I'm reluctant
++ *       to do so when this should handle 99% of the time...
++ */
++static GList *
++compute_locale_variants (const gchar *locale)
++{
++  GList *retval = NULL;
++
++  gchar *language;
++  gchar *territory;
++  gchar *codeset;
++  gchar *modifier;
++
++  guint mask;
++  guint i;
++
++  g_return_val_if_fail (locale != NULL, NULL);
++
++  mask = explode_locale (locale, &language, &territory, &codeset, &modifier);
++
++  /* Iterate through all possible combinations, from least attractive
++   * to most attractive.
++   */
++  for (i=0; i<=mask; i++)
++    if ((i & ~mask) == 0)
++      {
++	gchar *val = g_strconcat(language,
++				 (i & COMPONENT_TERRITORY) ? territory : "",
++				 (i & COMPONENT_CODESET) ? codeset : "",
++				 (i & COMPONENT_MODIFIER) ? modifier : "",
++				 NULL);
++	retval = g_list_prepend (retval, val);
++      }
++
++  g_free (language);
++  if (mask & COMPONENT_CODESET)
++    g_free (codeset);
++  if (mask & COMPONENT_TERRITORY)
++    g_free (territory);
++  if (mask & COMPONENT_MODIFIER)
++    g_free (modifier);
++
++  return retval;
++}
++
++/* The following is (partly) taken from the gettext package.
++   Copyright (C) 1995, 1996, 1997, 1998 Free Software Foundation, Inc.  */
++
++static const gchar *
++guess_category_value (const gchar *categoryname)
++{
++  const gchar *retval;
++
++  /* The highest priority value is the `LANGUAGE' environment
++     variable.  This is a GNU extension.  */
++  retval = getenv ("LANGUAGE");
++  if (retval != NULL && retval[0] != '\0')
++    return retval;
++
++  /* `LANGUAGE' is not set.  So we have to proceed with the POSIX
++     methods of looking to `LC_ALL', `LC_xxx', and `LANG'.  On some
++     systems this can be done by the `setlocale' function itself.  */
++
++  /* Setting of LC_ALL overwrites all other.  */
++  retval = getenv ("LC_ALL");  
++  if (retval != NULL && retval[0] != '\0')
++    return retval;
++
++  /* Next comes the name of the desired category.  */
++  retval = getenv (categoryname);
++  if (retval != NULL && retval[0] != '\0')
++    return retval;
++
++  /* Last possibility is the LANG environment variable.  */
++  retval = getenv ("LANG");
++  if (retval != NULL && retval[0] != '\0')
++    return retval;
++
++  return NULL;
++}
++
++
++static GHashTable *category_table= NULL;
++
++
++/**
++ * gnome_i18n_get_language_list:
++ * @category_name: Name of category to look up, e.g. "LC_MESSAGES".
++ * 
++ * This computes a list of language strings.  It searches in the
++ * standard environment variables to find the list, which is sorted
++ * in order from most desirable to least desirable.  The `C' locale
++ * is appended to the list if it does not already appear.
++ * If @category_name is %NULL, then LC_ALL is assumed.
++ * 
++ * Return value: the list of languages
++ **/
++GList *
++gnome_i18n_get_language_list (const gchar *category_name)
++{
++  GList *list;
++
++  if (!category_name)
++    category_name= "LC_ALL";
++
++  if (category_table)
++    {
++      list= g_hash_table_lookup (category_table, (const gpointer) category_name);
++    }
++  else
++    {
++      category_table= g_hash_table_new (g_str_hash, g_str_equal);
++      list= NULL;
++    }
++
++  if (!list)
++    {
++      gint c_locale_defined= FALSE;
++  
++      const gchar *category_value;
++      gchar *category_memory, *orig_category_memory;
++
++      category_value = guess_category_value (category_name);
++      if (! category_value)
++	category_value = "C";
++      orig_category_memory = category_memory =
++	g_malloc (strlen (category_value)+1);
++      
++      while (category_value[0] != '\0')
++	{
++	  while (category_value[0] != '\0' && category_value[0] == ':')
++	    ++category_value;
++	  
++	  if (category_value[0] != '\0')
++	    {
++	      char *cp= category_memory;
++	      
++	      while (category_value[0] != '\0' && category_value[0] != ':')
++		*category_memory++= *category_value++;
++	      
++	      category_memory[0]= '\0'; 
++	      category_memory++;
++	      
++	      cp = unalias_lang(cp);
++	      
++	      if (strcmp (cp, "C") == 0)
++		c_locale_defined= TRUE;
++	      
++	      list= g_list_concat (list, compute_locale_variants (cp));
++	    }
++	}
++
++      g_free (orig_category_memory);
++      
++      if (!c_locale_defined)
++	list= g_list_append (list, "C");
++
++      g_hash_table_insert (category_table, (gpointer) category_name, list);
++    }
++  
++  return list;
++}
+diff -Nur wmconfig-0.9.10.orig/gnome-i18nP.h wmconfig-0.9.10/gnome-i18nP.h
+--- wmconfig-0.9.10.orig/gnome-i18nP.h	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-i18nP.h	Sat Nov 23 21:20:45 2002
+@@ -0,0 +1,15 @@
++/*
++ * Handles i18n for the Gnome libraries. Libraries need to use
++ * dgettext in order to use a non-default translation domain.
++ * Author: Tom Tromey <tromey@creche.cygnus.com>
++ */
++
++#ifndef __GNOME_I18NP_H__
++#define __GNOME_I18NP_H__
++
++#    include <libintl.h>
++
++const char *gnome_i18n_get_language(void);
++GList      *gnome_i18n_get_language_list (const gchar *category_name);
++
++#endif /* __GNOME_UTIL_H__ */
+diff -Nur wmconfig-0.9.10.orig/gnome-util.c wmconfig-0.9.10/gnome-util.c
+--- wmconfig-0.9.10.orig/gnome-util.c	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-util.c	Sat Nov 23 21:44:00 2002
+@@ -0,0 +1,188 @@
++/*
++ *
++ * Gnome utility routines.
++ * (C)  1997, 1998, 1999 the Free Software Foundation.
++ *
++ * Author: Miguel de Icaza, 
++ */
++
++/* needed for S_ISLNK with 'gcc -ansi -pedantic' on GNU/Linux */
++#ifndef _BSD_SOURCE
++#  define _BSD_SOURCE 1
++#endif
++#include <sys/types.h>
++
++#include <errno.h>
++#include <stdarg.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++#include <glib.h>
++#include <sys/stat.h>
++#include <pwd.h>
++#include "gnome-util.h"
++
++#define GNOMESYSCONFDIR "/etc/X11/GNOME"
++#define GNOMEDATADIR "/usr/X11R6/share"
++
++static char *
++gnome_dirrelative_file (const char *base, const char *sub, const char *filename, int unconditional)
++{
++        static char *gnomedir = NULL;
++	char *dir = NULL, *fil = NULL, *odir = NULL, *ofil = NULL;
++	char *retval = NULL;
++	
++	/* First try the env GNOMEDIR relative path */
++	if(!gnomedir)
++		gnomedir = getenv ("GNOMEDIR");
++	
++	if (gnomedir) {
++		dir = g_concat_dir_and_file (gnomedir, sub);
++		fil = g_concat_dir_and_file (dir, filename);
++
++		if (g_file_exists (fil)) {
++			retval = fil; fil = NULL; goto out;
++		}
++
++		odir = dir; ofil = fil;
++		dir = g_concat_dir_and_file (gnome_util_user_home (), sub);
++		fil = g_concat_dir_and_file (dir, filename);
++
++		if (strcmp (odir, dir) != 0 && g_file_exists (fil)) {
++			retval = fil; fil = NULL; goto out;
++		}
++
++		if (unconditional) {
++			retval = ofil; ofil = NULL; goto out;
++		}
++	}
++
++	if ((!dir || strcmp (base, dir) != 0)
++	    && (!odir || strcmp (base, odir) != 0)) {
++		/* Then try the hardcoded path */
++		g_free (fil);
++		fil = g_concat_dir_and_file (base, filename);
++		
++		if (unconditional || g_file_exists (fil)) {
++			retval = fil; fil = NULL; goto out;
++		}
++	}
++
++	/* Finally, attempt to find it in the current directory */
++	g_free (fil);
++	fil = g_concat_dir_and_file (".", filename);
++	
++	if (g_file_exists (fil)) {
++		retval = fil; fil = NULL; goto out;
++	}
++
++out:	
++	g_assert(retval || !unconditional);
++
++	g_free (dir); g_free (odir); g_free (fil); g_free (ofil);
++
++	return retval;
++}
++
++/**
++ * gnome_pixmap_file:
++ * @filename: pixmap filename
++ *
++ * Returns a newly allocated filename from the GNOMEDIR tree or from the
++ * GNOME installation directory for the pixmap directory ($prefix/share/pixmaps),
++ * or NULL if the file does not exist.
++ */
++char *
++gnome_pixmap_file (const char *filename)
++{
++	return (gnome_dirrelative_file (GNOMEDATADIR "/pixmaps", "share/pixmaps", filename, FALSE));
++}
++
++/**
++ * gnome_config_file:
++ * @filename: config filename
++ *
++ * Locates a configuration file ($prefix/etc) in the GNOMEDIR tree, the
++ * GNOME installation direcory or the current directory.
++ *
++ * Returns a newly allocated filename from the GNOMEDIR tree or from the
++ * GNOME installation directory
++ */
++char *
++gnome_config_file (const char *filename)
++{
++	return (gnome_dirrelative_file (GNOMESYSCONFDIR, "etc", filename, FALSE));
++}
++
++/**
++ * g_file_exists
++ * @filename: pathname to test for existance.
++ *
++ * Returns true if filename exists
++ * left in for binary compatibility for a while FIXME: remove
++ */
++int
++g_file_exists (const char *filename)
++{
++	struct stat s;
++
++	g_return_val_if_fail (filename != NULL,FALSE);
++	
++	return stat (filename, &s) == 0;
++}
++
++/**
++ * g_concat_dir_and_file:
++ * @dir:  directory name
++ * @file: filename.
++ *
++ * returns a new allocated string that is the concatenation of dir and file,
++ * takes care of the exact details for concatenating them.
++ */
++char *
++g_concat_dir_and_file (const char *dir, const char *file)
++{
++	g_return_val_if_fail (dir != NULL, NULL);
++	g_return_val_if_fail (file != NULL, NULL);
++
++        /* If the directory name doesn't have a / on the end, we need
++	   to add one so we get a proper path to the file */
++	if (dir [strlen(dir) - 1] != PATH_SEP)
++		return g_strconcat (dir, PATH_SEP_STR, file, NULL);
++	else
++		return g_strconcat (dir, file, NULL);
++}
++
++/**
++ * gnome_is_program_in_path:
++ * @program: a program name.
++ *
++ * Looks for program in the PATH, if it is found, a g_strduped
++ * string with the full path name is returned.
++ *
++ * Returns NULL if program is not on the path or a string 
++ * allocated with g_malloc with the full path name of the program
++ * found
++ */
++gchar *
++gnome_is_program_in_path (const gchar *program)
++{
++	static gchar **paths = NULL;
++	gchar **p;
++	gchar *f;
++	
++	if (!paths)
++	  paths = g_strsplit(getenv("PATH"), ":", -1);
++
++	p = paths;
++	while (*p){
++		f = g_strconcat (*p,"/",program, NULL);
++		if (g_file_exists (f))
++			return f;
++		g_free (f);
++		p++;
++	}
++	return 0;
++}
++
+diff -Nur wmconfig-0.9.10.orig/gnome-util.h wmconfig-0.9.10/gnome-util.h
+--- wmconfig-0.9.10.orig/gnome-util.h	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/gnome-util.h	Sat Nov 23 21:41:36 2002
+@@ -0,0 +1,66 @@
++#ifndef __GNOME_UTIL_H__
++#define __GNOME_UTIL_H__
++
++#include <stdlib.h>
++#include <glib.h>
++
++#define PATH_SEP '/'
++#define PATH_SEP_STR "/"
++
++/* Prepend the correct prefix to a filename you expect to find in the
++   GNOME libdir, datadir, or pixmap directory. Return NULL if the file
++   does not exist. "unconditional" versions always return a full path,
++   even if the file doesn't exist. */
++
++char *gnome_pixmap_file (const char *filename);
++char *gnome_config_file (const char *filename);
++
++enum {
++	G_FILE_TEST_EXISTS=(1<<0)|(1<<1)|(1<<2), /*any type of file*/
++	G_FILE_TEST_ISFILE=1<<0,
++	G_FILE_TEST_ISLINK=1<<1,
++	G_FILE_TEST_ISDIR=1<<2
++};
++
++int g_file_exists (const char *filename);
++
++/* locate a program in $PATH, or return NULL if not found */
++gchar *gnome_is_program_in_path (const gchar *program);
++
++/* g_copy_strings superceded by GLib's g_strconcat */
++#define g_copy_strings g_strconcat
++
++/* Make a dir and a file into a full path, handling / issues. */
++char *g_concat_dir_and_file (const char *dir, const char *file);
++
++/* Find out where the filename starts; note that it may actually
++   be a directory, it's just the last segment of the full path. 
++   Return is an index into the char array. */
++/* int g_filename_index       (const char * path); */
++#define g_filename_index(path) (g_basename(path)-(path))
++/* Pointer to the start of the filename */ 
++/* const char * g_filename_pointer  (const char * path); */
++#define g_filename_pointer g_basename
++
++/* separator can be NULL */
++#define g_flatten_vector g_strjoinv
++
++/* returns the home directory of the user
++ * This one is NOT to be free'd or changed.
++ * 
++ */
++#define gnome_util_user_home() g_get_home_dir()
++
++/* pass in a string, and it will add the users home dir ie,
++ * pass in .gnome/bookmarks.html and it will return
++ * /home/imain/.gnome/bookmarks.html
++ * 
++ * Remember to g_free() returned value! */
++#define gnome_util_prepend_user_home(x) (g_concat_dir_and_file(gnome_util_user_home(), (x)))
++
++/* very similar to above, but adds $HOME/.gnome/ to beginning
++ * This is meant to be the most useful version.
++ */
++#define gnome_util_home_file(afile) (g_strconcat(gnome_util_user_home(), "/.gnome/", (afile), NULL))
++
++#endif
+diff -Nur wmconfig-0.9.10.orig/input-gnome.c wmconfig-0.9.10/input-gnome.c
+--- wmconfig-0.9.10.orig/input-gnome.c	Sat Nov 23 20:35:07 2002
++++ wmconfig-0.9.10/input-gnome.c	Sat Nov 23 20:36:49 2002
+@@ -17,7 +17,7 @@
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+ 
+-#include <gnome.h>
++#include "gnome-dentry.h"
+ 
+ #include <stdio.h>
+ #include <errno.h>
+diff -Nur wmconfig-0.9.10.orig/parse-path.cP wmconfig-0.9.10/parse-path.cP
+--- wmconfig-0.9.10.orig/parse-path.cP	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/parse-path.cP	Wed Apr  5 19:01:09 2000
+@@ -0,0 +1,100 @@
++/* This is a -*- C -*- file fragment.  Please don't compile it, however.  */
++
++typedef struct {
++	char *file, *section, *key, *def;
++	char *path, *opath;
++} ParsedPath;
++
++static const char * GNOME_CONFIG_PARSE_ERROR = "__(null)__";
++
++static void
++release_path (ParsedPath *p)
++{
++	if(p->file != GNOME_CONFIG_PARSE_ERROR)
++		g_free (p->file);
++	g_free (p->opath);
++	g_free (p);
++}
++
++static ParsedPath *
++parse_path (const char *path, gint priv)
++{
++	ParsedPath *p = g_malloc (sizeof (ParsedPath));
++
++	g_assert(path != NULL);
++	
++	if (*path == '/' || prefix == NULL)
++		p->opath = g_strdup (path);
++	else
++		p->opath = g_strconcat (prefix, path,NULL);
++		/*p->opath = g_concat_dir_and_file (prefix, path);*/
++
++	p->path    = p->opath;
++	p->file    = (char *)GNOME_CONFIG_PARSE_ERROR;
++	p->section = (char *)GNOME_CONFIG_PARSE_ERROR;
++	p->key     = (char *)GNOME_CONFIG_PARSE_ERROR;
++
++	if (*p->path == '='){
++		char *token;
++		/* If it is an absolute path name */
++		p->path++;
++		if ((token = strtok (p->path, "="))) {
++			if (token[0]=='/')
++				p->file = g_strdup (token);
++			else {
++				char *cwd = g_get_current_dir();
++				p->file = g_concat_dir_and_file(cwd,token);
++				g_free(cwd);
++			}
++		}
++		if ((token = strtok (NULL, "/=")))
++			p->section = token;
++		if ((token = strtok (NULL, "=")))
++			p->key     = token;
++		p->def     = strtok (NULL, "=");
++	} else {
++		char *end;
++
++		p->file    = p->path;
++		p->def     = NULL;
++		if ((end = strchr (p->path, '='))) {
++			*end = 0;
++			p->def = end + 1;
++		} else 
++			end = p->path + strlen (p->path);
++
++		/* Look backwards for a slash, to split key from the filename/section */
++		while (end > p->path){
++			end--;
++			if (*end == '/'){
++				*end = 0;
++				p->key = end + 1;
++				break;
++			}
++		}
++
++		/* Look backwards for the next slash, to get the section name */
++		while (end > p->path){
++			end--;
++			if (*end == '/'){
++				*end = 0;
++				p->section = end + 1;
++				break;
++			}
++		}
++		if (*p->file == '/')
++			p->file++;
++
++		if (priv){
++			p->file = g_strconcat (gnome_util_user_home(), "/.gnome_private/", (p->file), NULL);
++		} else {
++			p->file = g_strconcat (gnome_util_user_home(), "/.gnome/", (p->file), NULL);
++		}
++	}
++	if (p->file    == GNOME_CONFIG_PARSE_ERROR ||
++	    p->section == GNOME_CONFIG_PARSE_ERROR ||
++	    p->section == GNOME_CONFIG_PARSE_ERROR) {
++		g_warning ("invalid gnome config path \'%s\'\n", path);
++	}
++	return p;
++}

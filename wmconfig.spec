@@ -1,6 +1,6 @@
 #
 # Conditional build:
-# _without_gnome - without GNOME support
+# _without_gnome - with minimal gnome-libs fragment instead of libgnome.a
 #
 Summary:	Window Manager Configurator
 Summary(de):	Window Manager Configurator
@@ -11,7 +11,7 @@ Summary(pt_BR):	Configurador de gerenciadores de janelas
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.10
-Release:	13
+Release:	14
 License:	GPL
 Group:		X11/Window Managers/Tools
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
@@ -27,6 +27,7 @@ Patch7:		%{name}-fvwm2-dynamic_menus.patch
 Patch8:		%{name}-fvwm2-no_percent.patch
 Patch9:		%{name}-blackbox_common.patch
 Patch10:	%{name}-mwm.patch
+Patch11:	%{name}-minignome.patch
 BuildRequires:	autoconf
 BuildRequires:	automake
 BuildRequires:	glib-devel
@@ -77,6 +78,7 @@ IceWM, KDE, WindowMaker.
 %patch8 -p1
 %patch9 -p1
 %patch10 -p0
+%{?_without_gnome:%patch11 -p1}
 
 %build
 rm -f acinclude.m4 missing
@@ -84,8 +86,10 @@ rm -f acinclude.m4 missing
 %{__autoconf}
 %{__automake}
 LDFLAGS="%{rpmldflags} -L%{_libdir}"
+# NOTE: --enable-gnome is *needed* in PLD (because of .desktop files)
+# for build _without_gnome, minimal part of gnome-libs is added by patch11
 %configure \
-	%{!?_without_gnome:--enable-gnome}
+	--enable-gnome
 %{__make}
 
 %install
