@@ -63,7 +63,7 @@ WindowMaker.
 rm -f acinclude.m4 missing
 aclocal
 autoconf
-automake -a -c
+automake -a -c -f
 LDFLAGS="%{rpmldflags} -L%{_libdir}"
 %configure \
 	%{!?_without_gnome:--enable-gnome}
