@@ -1,16 +1,16 @@
-Summary:     Window Manager Configurator
-Summary(de): Window Manager Configurator 
-Summary(fr): Configurateur de gestionnaires de fenêtres
-Summary(pl): Konfigurator zarz±dców okien
-Summary(tr): Pencere denetleyicisi ayarlarý
-Name:        wmconfig
-Version:     0.9.2
-Release:     2
-Copyright:   GPL
-Group:       X11/Window Managers/Tools
-Group(pl):   X11/Zarz±dcy Okien/Narzêdzia
-Source:      ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
-Buildroot:   /tmp/%{name}-%{version}-root
+Summary:	Window Manager Configurator
+Summary(de):	Window Manager Configurator 
+Summary(fr):	Configurateur de gestionnaires de fenêtres
+Summary(pl):	Konfigurator zarz±dców okien
+Summary(tr):	Pencere denetleyicisi ayarlarý
+Name:		wmconfig
+Version:	0.9.2
+Release:	2
+Copyright:	GPL
+Group:		X11/Window Managers/Tools
+Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
+Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
+Buildroot:	/tmp/%{name}-%{version}-root
 
 %description
 This is a program that will generate menu configurations for different 
@@ -28,7 +28,8 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 %setup -q
 
 %build
-CFLAGS="$RPM_OPT_FLAGS" LDFLAGS=-s ./configure \
+CFLAGS="$RPM_OPT_FLAGS" LDFLAGS="-s" \
+./configure \
 	--prefix=/usr/X11R6
 make 
 
