@@ -9,7 +9,7 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.10
-Release:	6
+Release:	7
 License:	GPL
 Group:		X11/Window Managers/Tools
 Group(de):	X11/Fenstermanager/Werkzeuge
@@ -23,6 +23,7 @@ Patch4:		%{name}-gnomelibs.patch
 Patch5:		%{name}-applnk.patch
 Patch6:		%{name}-unicode.patch
 Patch7:		%{name}-fvwm2-dynamic_menus.patch
+Patch8:		%{name}-fvwm2-no_percent.patch
 BuildRequires:	autoconf
 BuildRequires:	automake
 BuildRequires:	glib-devel
@@ -56,6 +57,7 @@ WindowMaker.
 %patch5 -p1
 %patch6 -p1
 %patch7 -p1
+%patch8 -p1
 
 %build
 rm -f acinclude.m4 missing
