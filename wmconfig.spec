@@ -81,7 +81,7 @@ IceWM, KDE, WindowMaker.
 %patch9 -p1
 %patch10 -p0
 %{?_without_gnome:%patch11 -p1}
-%patch12 -p1
+%{?_without_gnome:%patch12 -p1}
 
 %build
 rm -f acinclude.m4 missing
