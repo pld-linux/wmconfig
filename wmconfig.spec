@@ -5,12 +5,12 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.3
-Release:	2
+Release:	3
 Copyright:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
-Patch0:		wmconfig-GNOME_patch.patch
+Patch0:		wmconfig-GNOME_path.patch
 Patch1:		wmconfig-man.patch.gz
 Patch2:		wmconfig-config.patch
 Buildroot:	/tmp/%{name}-%{version}-root
@@ -32,7 +32,7 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 
 %prep
 %setup -q
-%patch0 -p1
+%patch0 -p0
 %patch1 -p0
 %patch2 -p0
 
@@ -45,7 +45,7 @@ make
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1}
+install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,/etc/X11/wmconfig}
 
 make DESTDIR=$RPM_BUILD_ROOT install-strip
 
@@ -58,6 +58,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(644,root,root,755)
 %doc {AUTHORS,README,TODO,ChangeLog}.gz
-
 %attr(755,root,root) %{_bindir}/wmconfig
 %{_mandir}/man1/wmconfig.1.*
+
+%dir /etc/X11/wmconfig
