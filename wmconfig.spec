@@ -3,7 +3,7 @@
 # _without_gnome - without GNOME support
 #
 Summary:	Window Manager Configurator
-Summary(de):	Window Manager Configurator 
+Summary(de):	Window Manager Configurator
 Summary(fr):	Configurateur de gestionnaires de fenêtres
 Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
@@ -65,7 +65,7 @@ automake -a -c
 LDFLAGS="%{rpmldflags} -L%{_libdir}"
 %configure \
 	%{!?_without_gnome:--enable-gnome}
-%{__make} 
+%{__make}
 
 %install
 rm -rf $RPM_BUILD_ROOT
