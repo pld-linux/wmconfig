@@ -80,8 +80,8 @@ IceWM, KDE, WindowMaker.
 %build
 rm -f acinclude.m4 missing
 aclocal
-autoconf
-automake -a -c -f
+%{__autoconf}
+%{__automake}
 LDFLAGS="%{rpmldflags} -L%{_libdir}"
 %configure \
 	%{!?_without_gnome:--enable-gnome}
