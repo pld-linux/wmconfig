@@ -1,3 +1,7 @@
+#
+# Conditional build:
+# bcond_off_gnome - without GNOME support
+#
 Summary:	Window Manager Configurator
 Summary(de):	Window Manager Configurator 
 Summary(fr):	Configurateur de gestionnaires de fenêtres
@@ -18,7 +22,7 @@ Patch4:		wmconfig-gnomelibs.patch
 Patch5:		wmconfig-pre-post.patch
 Patch6:		wmconfig-applnk.patch
 BuildRequires:	glib-devel
-BuildRequires:	gnome-libs-static
+%{!?bcond_off_gnome:BuildRequires:	gnome-libs-static}
 BuildRequires:	zlib-devel
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
@@ -51,7 +55,7 @@ WindowMaker.
 %build
 LDFLAGS="-s -L%{_libdir}"; export LDFLAGS
 %configure \
-	--enable-gnome
+	%{!?bcond_off_gnome:--enable-gnome}
 %{__make} 
 
 %install
@@ -60,8 +64,7 @@ install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,%{_sysconfdir}/X11/wmconfi
 
 %{__make} install DESTDIR=$RPM_BUILD_ROOT
 
-gzip -9nf AUTHORS README TODO ChangeLog \
-	$RPM_BUILD_ROOT%{_mandir}/man1/wmconfig.1
+gzip -9nf AUTHORS README TODO ChangeLog
 
 %clean
 rm -rf $RPM_BUILD_ROOT
