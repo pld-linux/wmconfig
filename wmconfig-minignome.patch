@@ -18,7 +18,7 @@ diff -Nur wmconfig-0.9.10.orig/configure.in wmconfig-0.9.10/configure.in
  	    have_gnome=true
  	    AC_DEFINE(HAVE_GNOME)
 -	    GNOME_INCS="`gnome-config --cflags gnome`"
--	    GNOME_LIBS="/usr/X11R6/lib/libgnome.a -lglib -lpopt"
+-	    GNOME_LIBS="/usr/lib/libgnome.a -lglib -lpopt"
 +	    GNOME_INCS="-I/usr/include/glib-1.2 -I/usr/lib/glib/include"
 +	    GNOME_LIBS="-lglib -lpopt"
  	    AC_SUBST(GNOME_INCS)
@@ -2336,7 +2336,7 @@ diff -Nur wmconfig-0.9.10.orig/gnome-util.c wmconfig-0.9.10/gnome-util.c
 +#include "gnome-util.h"
 +
 +#define GNOMESYSCONFDIR "/etc/X11/GNOME"
-+#define GNOMEDATADIR "/usr/X11R6/share"
++#define GNOMEDATADIR "/usr/share"
 +
 +static char *
 +gnome_dirrelative_file (const char *base, const char *sub, const char *filename, int unconditional)

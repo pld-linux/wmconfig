@@ -6,7 +6,7 @@ diff -ur wmconfig-0.9.7.otig/configure.in wmconfig-0.9.7/configure.in
  	    AC_DEFINE(HAVE_GNOME)
  	    GNOME_INCS="`gnome-config --cflags gnome`"
 -	    GNOME_LIBS="`gnome-config --libs-only-l gnome`"
-+	    GNOME_LIBS="/usr/X11R6/lib/libgnome.a -lglib -lpopt"
++	    GNOME_LIBS="/usr/lib/libgnome.a -lglib -lpopt"
  	    AC_SUBST(GNOME_INCS)
  	    AC_SUBST(GNOME_LIBS)
  	    ;;
