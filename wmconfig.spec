@@ -12,8 +12,6 @@ Version:	0.9.10
 Release:	7
 License:	GPL
 Group:		X11/Window Managers/Tools
-Group(de):	X11/Fenstermanager/Werkzeuge
-Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
 Patch0:		%{name}-am_ac.patch
 Patch1:		%{name}-GNOME_path.patch
