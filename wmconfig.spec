@@ -67,5 +67,3 @@ rm -rf $RPM_BUILD_ROOT
 %doc {AUTHORS,README,TODO,ChangeLog}.gz
 %attr(755,root,root) %{_bindir}/wmconfig
 %{_mandir}/man1/*
-
-%dir %{_sysconfdir}/X11/wmconfig
