@@ -35,6 +35,7 @@ BuildRequires:	automake
 BuildRequires:	glib-devel
 %{!?_without_gnome:BuildRequires:	gnome-libs-static}
 BuildRequires:	zlib-devel
+BuildRequires:	popt-static
 Requires:	applnk
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
