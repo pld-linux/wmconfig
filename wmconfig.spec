@@ -10,6 +10,7 @@ Copyright:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
+Patch:		wmconfig-GNOME_patch.patch
 Buildroot:	/tmp/%{name}-%{version}-root
 
 %description
@@ -26,6 +27,7 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 
 %prep
 %setup -q
+%patch -p1
 
 %build
 CFLAGS="$RPM_OPT_FLAGS" LDFLAGS="-s" \
@@ -53,8 +55,11 @@ rm -rf $RPM_BUILD_ROOT
 /usr/X11R6/man/man1/wmconfig.1.*
 
 %changelog
-* Wed Mar 31 1999 Piotr Czerwiñski <pius@pld.org.pl>
+* Wed Mar 31 1999 Tomasz K³oczko <kloczek@rudy.mif.pg.gda.pl>
   [0.9.2-2]
+- fixed patch to GNOME application description (wmconfig-GNOME_patch.patch).
+
+* Wed Mar 31 1999 Piotr Czerwiñski <pius@pld.org.pl>
 - removed "%dir /etc/X11/wmconfig" from %files 
   (it comes with the filesystem package now).
 
