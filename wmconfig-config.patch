@@ -1,11 +1,19 @@
---- wmconfig.c~	Wed Mar 31 23:51:00 1999
-+++ wmconfig.c	Tue Jun 29 12:43:57 1999
-@@ -23,6 +23,8 @@
-  * WM config program
+--- wmconfig.h~	Sat Apr 17 03:51:48 1999
++++ wmconfig.h	Sat Sep 18 16:31:09 1999
+@@ -42,14 +42,14 @@
+  * How the root menu is called...
   */
+ #ifndef DEFAULT_ROOT_NAME
+-#define DEFAULT_ROOT_NAME	"Red Hat Linux"
++#define DEFAULT_ROOT_NAME	"PLD Linux"
+ #endif /* DEFAULT_ROOT_NAME */
  
-+#include <config.h>
-+
- #include <stdio.h>
- #include <stdlib.h>
- #include <unistd.h>
+ /*
+  * Where start menu directories generate
+  */
+ #ifndef DEFAULT_OUTPUTDIR
+-#define DEFAULT_OUTPUTDIR "GNUstep/Library/AfterStep/redhat"
++#define DEFAULT_OUTPUTDIR "GNUstep/Library/AfterStep/start"
+ #endif /* DEFAULT_OUTPUTDIR */
+ 
+ /* Maximum items per group */
