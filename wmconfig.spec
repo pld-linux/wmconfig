@@ -5,7 +5,7 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.7
-Release:	4
+Release:	5
 License:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
@@ -14,8 +14,9 @@ Patch0:		wmconfig-GNOME_path.patch
 Patch1:		wmconfig-man.patch.gz
 Patch2:		wmconfig-config.patch
 Patch3:		wmconfig-input.patch
+Patch4:		wmconfig-gnomelibs.patch
 BuildRequires:	glib-devel
-BuildRequires:	gnome-libs-devel
+BuildRequires:	gnome-libs-static
 BuildRequires:	zlib-devel
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
@@ -41,6 +42,7 @@ WindowMaker.
 %patch1 -p0
 %patch2 -p0
 %patch3 -p0
+%patch4 -p1
 
 %build
 LDFLAGS="-s -L%{_libdir}"; export LDFLAGS
