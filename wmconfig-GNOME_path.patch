@@ -1,0 +1,18 @@
+--- wmconfig.c~	Wed Mar 31 23:51:00 1999
++++ wmconfig.c	Wed Sep  8 00:02:21 1999
+@@ -331,10 +331,14 @@
+ 
+ #if  HAVE_GNOME
+     /* tack on system GNOME files */
+-    ret = parse_gnome_files("/usr/share/gnome/apps", NULL);
++    ret = parse_gnome_files("/usr/X11R6/share/gnome/apps", NULL);
+     if (ret != PARSE_OK)
+ 	fprintf(stderr, "Parsing user files error: %s\n", parse_errstr(ret));
+ 
++    ret = parse_gnome_files("/usr/X11R6/share/applnk", NULL);
++    if (ret != PARSE_OK)
++	fprintf(stderr, "Parsing user files error: %s\n", parse_errstr(ret));
++    
+     ret = parse_gnome_files("/etc/X11/applnk", NULL);
+     if (ret != PARSE_OK)
+ 	fprintf(stderr, "Parsing user files error: %s\n", parse_errstr(ret));
