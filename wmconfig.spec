@@ -4,8 +4,8 @@ Summary(fr):	Configurateur de gestionnaires de fenêtres
 Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
-Version:	0.9.3
-Release:	3
+Version:	0.9.5
+Release:	1
 Copyright:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
@@ -37,9 +37,10 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 %patch2 -p0
 
 %build
-CFLAGS="$RPM_OPT_FLAGS" LDFLAGS="-s -L/usr/X11R6/lib" \
-./configure %{_target_platform} \
-	--prefix=%{_prefix} \
+CFLAGS="$RPM_OPT_FLAGS" 
+LDFLAGS="-s -L/usr/X11R6/lib"
+export CFLAGS LDFLAGS
+%configure \
 	--enable-gnome
 make 
 
@@ -47,7 +48,7 @@ make
 rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,/etc/X11/wmconfig}
 
-make DESTDIR=$RPM_BUILD_ROOT install-strip
+make install-strip DESTDIR=$RPM_BUILD_ROOT
 
 gzip -9nf AUTHORS README TODO ChangeLog \
 	$RPM_BUILD_ROOT%{_mandir}/man1/wmconfig.1
@@ -59,6 +60,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(644,root,root,755)
 %doc {AUTHORS,README,TODO,ChangeLog}.gz
 %attr(755,root,root) %{_bindir}/wmconfig
-%{_mandir}/man1/wmconfig.1.*
+%{_mandir}/man1/wmconfig.1.gz
 
 %dir /etc/X11/wmconfig
