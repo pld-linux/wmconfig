@@ -10,7 +10,8 @@ Copyright:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
-Patch:		wmconfig-GNOME_patch.patch
+Patch0:		wmconfig-GNOME_patch.patch
+Patch1:		wmconfig-man.patch
 Buildroot:	/tmp/%{name}-%{version}-root
 
 %description
@@ -27,7 +28,8 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 
 %prep
 %setup -q
-%patch -p1
+%patch0 -p1
+%patch1 -p1
 
 %build
 CFLAGS="$RPM_OPT_FLAGS" LDFLAGS="-s" \
