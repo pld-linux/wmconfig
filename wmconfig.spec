@@ -12,15 +12,16 @@ Version:	0.9.9
 Release:	5
 License:	GPL
 Group:		X11/Window Managers/Tools
+Group(de):	X11/Fenstermanager/Werkzeuge
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
-Patch0:		wmconfig-GNOME_path.patch
-Patch1:		wmconfig-man.patch.gz
-Patch2:		wmconfig-config.patch
-Patch3:		wmconfig-input.patch
-Patch4:		wmconfig-gnomelibs.patch
-Patch5:		wmconfig-pre-post.patch
-Patch6:		wmconfig-applnk.patch
+Patch0:		%{name}-GNOME_path.patch
+Patch1:		%{name}-man.patch.gz
+Patch2:		%{name}-config.patch
+Patch3:		%{name}-input.patch
+Patch4:		%{name}-gnomelibs.patch
+Patch5:		%{name}-pre-post.patch
+Patch6:		%{name}-applnk.patch
 BuildRequires:	glib-devel
 %{!?_without_gnome:BuildRequires:	gnome-libs-static}
 BuildRequires:	zlib-devel
@@ -53,7 +54,7 @@ WindowMaker.
 %patch6 -p1
 
 %build
-LDFLAGS="-s -L%{_libdir}"; export LDFLAGS
+LDFLAGS="%{rpmldflags} -L%{_libdir}"
 %configure \
 	%{!?_without_gnome:--enable-gnome}
 %{__make} 
