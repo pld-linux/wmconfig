@@ -5,14 +5,18 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.3
-Release:	1
+Release:	2
 Copyright:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
 Patch0:		wmconfig-GNOME_patch.patch
 Patch1:		wmconfig-man.patch
+Patch2:		wmconfig-config.patch
 Buildroot:	/tmp/%{name}-%{version}-root
+
+%define _prefix	/usr/X11R6
+%define	_mandir	%{_prefix}/man
 
 %description
 This is a program that will generate menu configurations for different 
@@ -29,22 +33,24 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 %prep
 %setup -q
 %patch0 -p1
-%patch1 -p1
+%patch1 -p0
+%patch2 -p0
 
 %build
-CFLAGS="$RPM_OPT_FLAGS" LDFLAGS="-s" \
+CFLAGS="$RPM_OPT_FLAGS" LDFLAGS="-s -L/usr/X11R6/lib" \
 ./configure %{_target_platform} \
-	--prefix=/usr/X11R6
+	--prefix=%{_prefix} \
+	--enable-gnome
 make 
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT/usr/X11R6/{bin,man/man1}
+install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1}
 
 make DESTDIR=$RPM_BUILD_ROOT install-strip
 
 gzip -9nf AUTHORS README TODO ChangeLog \
-	$RPM_BUILD_ROOT/usr/X11R6/man/man1/wmconfig.1
+	$RPM_BUILD_ROOT%{_mandir}/man1/wmconfig.1
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -53,8 +59,8 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(644,root,root,755)
 %doc {AUTHORS,README,TODO,ChangeLog}.gz
 
-%attr(755,root,root) /usr/X11R6/bin/wmconfig
-/usr/X11R6/man/man1/wmconfig.1.*
+%attr(755,root,root) %{_bindir}/wmconfig
+%{_mandir}/man1/wmconfig.1.*
 
 %changelog
 * Mon Apr 19 1999 Piotr Czerwiñski <pius@pld.org.pl>
