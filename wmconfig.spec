@@ -15,8 +15,8 @@ Patch1:		wmconfig-man.patch.gz
 Patch2:		wmconfig-config.patch
 Buildroot:	/tmp/%{name}-%{version}-root
 
-%define _prefix	/usr/X11R6
-%define	_mandir	%{_prefix}/man
+%define 	_prefix		/usr/X11R6
+%define		_mandir		%{_prefix}/man
 
 %description
 This is a program that will generate menu configurations for different 
