@@ -15,6 +15,7 @@ Release:	11
 License:	GPL
 Group:		X11/Window Managers/Tools
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
+Source1:	%{name}-README.PLD
 Patch0:		%{name}-am_ac.patch
 Patch1:		%{name}-GNOME_path.patch
 Patch2:		%{name}-config.patch
@@ -91,8 +92,8 @@ rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,%{_sysconfdir}/X11/wmconfig}
 
 %{__make} install DESTDIR=$RPM_BUILD_ROOT
-
-gzip -9nf AUTHORS README TODO ChangeLog
+cp %{SOURCE1} README.PLD
+gzip -9nf AUTHORS README TODO ChangeLog README.PLD
 
 %clean
 rm -rf $RPM_BUILD_ROOT
