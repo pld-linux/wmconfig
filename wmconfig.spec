@@ -11,7 +11,7 @@ Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
 Patch0:		wmconfig-GNOME_patch.patch
-Patch1:		wmconfig-man.patch
+Patch1:		wmconfig-man.patch.gz
 Patch2:		wmconfig-config.patch
 Buildroot:	/tmp/%{name}-%{version}-root
 
