@@ -17,3 +17,14 @@
  #endif /* DEFAULT_OUTPUTDIR */
  
  /* Maximum items per group */
+--- kde.c~	Wed Apr 29 20:39:30 1998
++++ kde.c	Sun Sep 19 17:26:53 1999
+@@ -43,7 +43,7 @@
+ #include "prototypes.h"
+ #include "package.h"
+ 
+-#define KDE_DIR		".kde/share/applnk/redhat"
++#define KDE_DIR		".kde/share/applnk/pld"
+ #define KDE_MENU_ICON	"package.xpm"
+ /* #define KDE_MENU_ICON	"mini-bx2.xpm" */
+ 
