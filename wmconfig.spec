@@ -14,6 +14,9 @@ Patch0:		wmconfig-GNOME_path.patch
 Patch1:		wmconfig-man.patch.gz
 Patch2:		wmconfig-config.patch
 Patch3:		wmconfig-input.patch
+BuildRequires:	glib-devel
+BuildRequires:	gnome-libs-devel
+BuildRequires:	zlib-devel
 Buildroot:	/tmp/%{name}-%{version}-root
 
 %define 	_prefix		/usr/X11R6
