@@ -32,7 +32,7 @@ diff -urN wmconfig-0.9.10/input-gnome.c wmconfig-0.9.10.new/input-gnome.c
  {
      GnomeDesktopEntry *dentry;
 -    char               *package, *name, *exec;
-+    char               *package, *name, *exec, *icon;
++    char               *package, *name, *exec, *icon = NULL;
      int                i, add_for_terminal;
  
  /*    fprintf(stderr, "scanning file %s in group %s\n",filename, group); */
