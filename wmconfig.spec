@@ -28,6 +28,7 @@ Patch8:		%{name}-fvwm2-no_percent.patch
 Patch9:		%{name}-blackbox_common.patch
 Patch10:	%{name}-mwm.patch
 Patch11:	%{name}-minignome.patch
+URL:		http://www.arrishq.org/
 BuildRequires:	autoconf
 BuildRequires:	automake
 BuildRequires:	glib-devel
