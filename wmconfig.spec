@@ -1,12 +1,14 @@
 Summary:     Window Manager Configurator
 Summary(de): Window Manager Configurator 
 Summary(fr): Configurateur de gestionnaires de fenêtres
+Summary(pl): Konfigurator menad¿erów okien
 Summary(tr): Pencere denetleyicisi ayarlarý
 Name:        wmconfig
 Version:     0.5
-Release:     2
+Release:     3
 Copyright:   GPL
-Group:       X11/Window Managers
+Group:       X11/Window Managers/Tools
+Group(pl):   X11/Zarz±dcy Okien/Narzêdzia
 Source:      ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
 Buildroot:   /tmp/%{name}-%{version}-root
 
@@ -17,28 +19,42 @@ form of abstractization of the menu configuration across some window managers.
 Currently it supports: FVWM2, FVWM95, Afterstep, MWM, IceWM, KDE,
 WindowMaker.
 
+%description -l pl
+Ten program u³atwia konfigurowanie menu w ró¿nych menad¿erach okien
+dostêpnych dla systemu X11. W tej chwili jest wspierany przez nastêpuj±ce
+programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
+
 %prep
 %setup -q -c 
 
 %build
-make CFLAGS="$RPM_OPT_FLAGS"
+make CFLAGS="$RPM_OPT_FLAGS" LDFLAGS=-s
 
 %install
 rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT/{etc/X11/wmconfig,usr/X11R6/man/man1}
-make install TOP_DIR=$RPM_BUILD_ROOT
 
+make install TOP_DIR=$RPM_BUILD_ROOT
 mv $RPM_BUILD_ROOT/usr/man/man1/wmconfig.1 $RPM_BUILD_ROOT/usr/X11R6/man/man1
+
+gzip -9nf $RPM_BUILD_ROOT/usr/X11R6/man/man1/*
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 %attr(755, root, root) %dir /etc/X11/wmconfig
-%attr(755, root, root) /usr/X11R6/bin/wmconfig
-%attr(755, root, root) /usr/X11R6/man/man1/wmconfig.1
+%attr(755, root, root) /usr/X11R6/bin/*
+%attr(755, root, root) /usr/X11R6/man/man1/*
 
 %changelog
+* Thu Feb 10 1999 Micha³ Kuratczyk <kurkens@polbox.com>
+  [0.5-3]
+- added Group(pl)
+- added LDFLAGS=-s
+- added pl translations
+- added gzipping man page
+
 * Sun Sep 13 1998 Tomasz K³oczko <kloczek@rudy.mif.pg.gda.pl>
   [0.5-2]
 - added -q %setup parameter,
