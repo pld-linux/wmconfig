@@ -11,7 +11,7 @@ Summary(pt_BR):	Configurador de gerenciadores de janelas
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.10
-Release:	14
+Release:	15
 License:	GPL
 Group:		X11/Window Managers/Tools
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
@@ -29,6 +29,7 @@ Patch8:		%{name}-fvwm2-no_percent.patch
 Patch9:		%{name}-blackbox_common.patch
 Patch10:	%{name}-mwm.patch
 Patch11:	%{name}-minignome.patch
+Patch12:	%{name}-icons.patch
 URL:		http://www.arrishq.org/
 BuildRequires:	autoconf
 BuildRequires:	automake
@@ -80,6 +81,7 @@ IceWM, KDE, WindowMaker.
 %patch9 -p1
 %patch10 -p0
 %{?_without_gnome:%patch11 -p1}
+%patch12 -p1
 
 %build
 rm -f acinclude.m4 missing
