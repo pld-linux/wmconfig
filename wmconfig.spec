@@ -46,13 +46,13 @@ WindowMaker.
 LDFLAGS="-s -L%{_libdir}"; export LDFLAGS
 %configure \
 	--enable-gnome
-make 
+%{__make} 
 
 %install
 rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,%{_sysconfdir}/X11/wmconfig}
 
-make install DESTDIR=$RPM_BUILD_ROOT
+%{__make} install DESTDIR=$RPM_BUILD_ROOT
 
 gzip -9nf AUTHORS README TODO ChangeLog \
 	$RPM_BUILD_ROOT%{_mandir}/man1/wmconfig.1
