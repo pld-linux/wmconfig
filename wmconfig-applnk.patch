@@ -1,0 +1,64 @@
+diff -urN wmconfig-0.9.9.orig/input-gnome.c wmconfig-0.9.9/input-gnome.c
+--- wmconfig-0.9.9.orig/input-gnome.c	Wed Aug  2 21:30:08 2000
++++ wmconfig-0.9.9/input-gnome.c	Wed Aug  2 21:39:26 2000
+@@ -49,9 +49,7 @@
+ 
+     dentry = gnome_desktop_entry_load(filename);
+ 
+-    /* skip if it has a tryexec */
+-    if (!dentry || dentry->tryexec) {
+-	gnome_desktop_entry_free(dentry);
++    if (!dentry) {
+ 	return 0;
+     }
+ 
+@@ -95,7 +93,7 @@
+     update_package(package, "exec", exec);
+     update_package(package, "name", name);
+     update_package(package, "group", group);
+-    
++
+     if (dentry->comment)
+ 	update_package(package, "description", dentry->comment);
+ 
+@@ -164,18 +162,25 @@
+ 	    if (ret)
+ 		return PARSE_ABORT;
+ 
+-	    if (S_ISDIR(st.st_mode) &&
+-		(strcmp(namelist[i]->d_name, "Settings") != 0)) {
++	    if (S_ISDIR(st.st_mode)) {
++		GnomeDesktopEntry *dentry;
+ 		char *newgroup;
++		char *name;
+ 		int  len;
+ 
+-		len = strlen(curgroup) + strlen(namelist[i]->d_name) + 2;
++		/* Try to load .directory. */
++		name = malloc(strlen(filename) + strlen(".directory") + 2);
++		sprintf(name, "%s/.directory", filename);
++		dentry = gnome_desktop_entry_load(name);
++		free(name);
++		name = dentry ? dentry->name : namelist[i]->d_name;
++
++		len = strlen(curgroup) + strlen(name) + 2;
+ 		newgroup = malloc(len);
+ 		if (*curgroup)
+-		    snprintf(newgroup,len,"%s/%s",curgroup,
+-			     namelist[i]->d_name);
++		    snprintf(newgroup,len,"%s/%s",curgroup, name);
+ 		else
+-		    strcpy(newgroup, namelist[i]->d_name);
++		    strcpy(newgroup, name);
+ 
+ 		ret_val = parse_gnome_files(filename, newgroup);
+ 		free(newgroup);
+@@ -183,6 +188,8 @@
+ 		    fprintf(stderr, "\tReading direcory \"%s\" failed !\n",
+ 			    filename);
+ 		}
++		if(dentry)
++		    gnome_desktop_entry_free(dentry);
+ 	    } else {
+ 		ret_val = read_gnome_file(filename, curgroup);
+ 		if (ret_val != 0) {
