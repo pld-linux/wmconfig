@@ -1,0 +1,501 @@
+
+Patch adding support for UTF-8 encoding in wmconfig, *.desktop and *.applnk files.
+UTF-8 strings are converted to locale selected encoding when writting window manager
+config files. Untranslatable strings are assumed to be already in proper encoding, so
+most non UTF-8 files should sill work.
+
+	Jace Konieczny <jajcus@pld.org.pl>
+
+
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/Makefile.am wmconfig-0.9.10/Makefile.am
+--- wmconfig-0.9.10.orig/Makefile.am	Sat Aug 28 00:38:16 1999
++++ wmconfig-0.9.10/Makefile.am	Sat Jul 28 16:25:47 2001
+@@ -25,7 +25,7 @@
+ INCLUDES	+= $(EXTRA_INCLUDES)
+ WM_FILES	= wmconfig.c input.c rootmenu.c afterstep_dir.c kde.c wmaker.c \
+ 		  package.c util.c afterstep.c fvwm95.c mwm.c debug.c fvwm2.c \
+-		  icewm.c blackbox.c parse.c
++		  icewm.c blackbox.c parse.c unicode.c
+ 
+ wmconfig_SOURCES = $(WM_FILES) $(EXTRA_FILES)
+ noinst_HEADERS = package.h parse.h prototypes.h wmconfig.h
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/afterstep.c wmconfig-0.9.10/afterstep.c
+--- wmconfig-0.9.10.orig/afterstep.c	Thu Feb  3 17:29:18 2000
++++ wmconfig-0.9.10/afterstep.c	Sat Jul 28 16:44:07 2001
+@@ -62,13 +62,13 @@
+ 
+ 	    if (!debug_icon) {
+ 		printf("# Icon specification for Apps installed for \"%s\" menu\n",
+-		       root->name);
++		       unicode_to_locale(root->name));
+ 		debug_icon++;
+ 	    }
+ 	    app = (struct package *)item->data;
+ 	    if ((app->name && app->icon) && !is_set(NO_ICONS)) {
+ 		printf("Icon\t\"%s\"\t\"%s\"\n",
+-		       app->name, app->icon);
++		       unicode_to_locale(app->name), app->icon);
+ 	    }
+ 	}
+ 	item++;
+@@ -77,14 +77,14 @@
+     /* third pass - the menu */
+     item = root->items;
+     printf("Popup\t\"%s\"\n\tTitle\t\"%s\"\n",
+-	   root->name, root->name);    
++	   unicode_to_locale(root->name), unicode_to_locale(root->name));    
+     while (item->type != 0) {
+ 	if (item->type == ITEM_MENU) {
+ 	    struct group *tmp;
+ 
+ 	    tmp = (struct group *)item->data;
+ 	    printf("\tPopup\t\"%s\"\t%s\n",
+-		   tmp->name, tmp->name);
++		   unicode_to_locale(tmp->name), unicode_to_locale(tmp->name));
+ 	} else if (item->type == ITEM_APP) {
+ 	    struct package *app;
+ 
+@@ -93,7 +93,7 @@
+ 		printf("\t# Added by the \"%s\" package\n",
+ 		       app->__package?app->__package:"");
+ 		printf("\tExec\t\"%s\"\texec %s\n",
+-		       app->name, app->exec);
++		       unicode_to_locale(app->name), app->exec);
+ 	    }
+ 	}
+ 	item++;
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/afterstep_dir.c wmconfig-0.9.10/afterstep_dir.c
+--- wmconfig-0.9.10.orig/afterstep_dir.c	Thu Feb  3 17:29:18 2000
++++ wmconfig-0.9.10/afterstep_dir.c	Sat Jul 28 16:46:27 2001
+@@ -78,7 +78,7 @@
+ 	perror("Error code");
+ 	return;
+     }
+-    fprintf(f, "Exec \"%s\" exec %s\n", item->name, item->exec);
++    fprintf(f, "Exec \"%s\" exec %s\n", unicode_to_locale(item->name), item->exec);
+     if (item->mini_icon != NULL && !is_set(NO_MINI_ICONS)) {
+ 	fprintf(f, "MiniPixmap \"%s\"\n", item->mini_icon);
+     }
+@@ -99,14 +99,14 @@
+ 	    struct group *tmp;
+ 
+ 	    tmp = (struct group *)item->data;
+-	    snprintf(c_tmp, PATH_MAX, "%s/%s", dir_name, tmp->name);
++	    snprintf(c_tmp, PATH_MAX, "%s/%s", dir_name, unicode_to_locale(tmp->name));
+ 	    mkdir(c_tmp, 0700);
+ 	} else if (item->type == ITEM_APP) {
+ 	    struct package *app;
+ 
+ 	    app = (struct package *)item->data;
+ 	    if (app->name && app->exec) {
+-		snprintf(c_tmp, PATH_MAX, "%s/%s", dir_name, app->name);
++		snprintf(c_tmp, PATH_MAX, "%s/%s", dir_name, unicode_to_locale(app->name));
+ 		if (!is_set(NEWSTYLE_DIRECTORIES))
+ 		    create_file(c_tmp, app->exec);
+ 		else
+@@ -122,7 +122,7 @@
+             struct group *tmp;
+ 
+ 	    tmp = (struct group *)item->data;
+-	    snprintf(c_tmp, PATH_MAX, "%s/%s", dir_name, tmp->name);
++	    snprintf(c_tmp, PATH_MAX, "%s/%s", dir_name, unicode_to_locale(tmp->name));
+ 	    make_dir(item->data, level+1, c_tmp);
+ 	}
+ 	item++;
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/blackbox.c wmconfig-0.9.10/blackbox.c
+--- wmconfig-0.9.10.orig/blackbox.c	Thu Feb  3 17:29:18 2000
++++ wmconfig-0.9.10/blackbox.c	Sat Jul 28 16:47:22 2001
+@@ -57,9 +57,9 @@
+         for (sp = 0; sp < level; sp++) putchar('\t');
+     
+     if (level == 0)
+-	printf("[begin] (%s)\n", valid_string(root->name));
++	printf("[begin] (%s)\n", valid_string(unicode_to_locale(root->name)));
+     else
+-	printf("[submenu] (%s)\n", valid_string(root->name));
++	printf("[submenu] (%s)\n", valid_string(unicode_to_locale(root->name)));
+ 
+     item = root->items;
+     while (item->type != 0) {
+@@ -72,7 +72,7 @@
+ 	    app = (struct package *)item->data;
+ 	    if (app->name && app->exec && app->__package) {
+                 for (sp = 0; sp <= level; sp++) putchar('\t');
+-		printf("[exec] (%s) {", valid_string(app->name));
++		printf("[exec] (%s) {", valid_string(unicode_to_locale(app->name)));
+ 					
+                 /* this removes ending '&' that should not be there */
+                 {
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/fvwm2.c wmconfig-0.9.10/fvwm2.c
+--- wmconfig-0.9.10.orig/fvwm2.c	Wed Feb 10 23:16:23 1999
++++ wmconfig-0.9.10/fvwm2.c	Sat Jul 28 16:50:04 2001
+@@ -46,7 +46,7 @@
+ 	return;
+     
+     printf("\n#\n# Starting configuration for menu \"%s\"\n#\n",
+-	   root->name);
++	   unicode_to_locale(root->name));
+     
+     item = root->items;
+     while (item->type != 0) {
+@@ -55,7 +55,7 @@
+ 
+ 	    if (!debug_icon) {
+ 		printf("# Icon specification for Apps under \"%s\"\n",
+-		       root->name);
++		       unicode_to_locale(root->name));
+ 		debug_icon++;
+ 	    }
+ 	    app = (struct package *)item->data;
+@@ -65,19 +65,19 @@
+ 			   app->Xresource, app->mini_icon);
+ 		else
+ 		    printf("Style\t\"%s\"\tMiniIcon\t%s\n",
+-			   app->name, app->mini_icon);
++			   unicode_to_locale(app->name), app->mini_icon);
+ 	    }
+ 	    if ((app->name && app->icon) && !is_set(NO_ICONS))
+ 		printf("Style\t\"%s\"\tIcon\t%s\n",
+-		       app->name, app->icon);
++		       unicode_to_locale(app->name), app->icon);
+ 	}
+ 	item++;
+     }
+ 
+-    root_name = single_string(root->name);
++    root_name = single_string(unicode_to_locale(root->name));
+     printf("# The menus...\n");
+     if (level)
+-	printf("AddToMenu\t%s%s\t\"%s\"\tTitle\n", menu_name, root_name, root->name);
++	printf("AddToMenu\t%s%s\t\"%s\"\tTitle\n", menu_name, root_name, unicode_to_locale(root->name));
+     
+     item = root->items;
+     while (item->type != 0) {
+@@ -86,9 +86,9 @@
+ 	    char *c_tmp;
+ 
+ 	    tmp = (struct group *)item->data;
+-	    c_tmp = single_string(tmp->name);
++	    c_tmp = single_string(unicode_to_locale(tmp->name));
+ 	    printf("AddToMenu\t%s%s\t\"%s\"\tPopup\t%s%s.%s\n",
+-		   menu_name, root_name, tmp->name,
++		   menu_name, root_name, unicode_to_locale(tmp->name),
+ 		   menu_name, root_name, c_tmp);
+ 	    free(c_tmp);
+ 	} else if (item->type == ITEM_APP) {
+@@ -100,10 +100,10 @@
+ 	    if (app->name && app->exec) {
+ 		if ((app->mini_icon != NULL) && !is_set(NO_MINI_ICONS))
+ 		    printf("AddToMenu\t%s%s\t\"%s %%%s%%\"\tExec\t%s\n",
+-			   menu_name, root_name, app->name, app->mini_icon, app->exec);
++			   menu_name, root_name, unicode_to_locale(app->name), app->mini_icon, app->exec);
+ 		else
+ 		    printf("AddToMenu\t%s%s\t\"%s\"\tExec\t%s\n",
+-			   menu_name, root_name, app->name, app->exec);
++			   menu_name, root_name, unicode_to_locale(app->name), app->exec);
+ 	    }
+ 	}
+ 	item++;
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/fvwm95.c wmconfig-0.9.10/fvwm95.c
+--- wmconfig-0.9.10.orig/fvwm95.c	Wed Feb 10 23:16:23 1999
++++ wmconfig-0.9.10/fvwm95.c	Sat Jul 28 16:52:20 2001
+@@ -46,7 +46,7 @@
+ 	return;
+     
+     printf("\n#\n# Starting configuration for menu \"%s\"\n#\n",
+-	   root->name);
++	   unicode_to_locale(root->name));
+     
+     item = root->items;
+     while (item->type != 0) {
+@@ -55,7 +55,7 @@
+ 
+ 	    if (!debug_icon) {
+ 		printf("# Icon specification for Apps under \"%s\"\n",
+-		       root->name);
++		       unicode_to_locale(root->name));
+ 		debug_icon++;
+ 	    }
+ 	    app = (struct package *)item->data;
+@@ -65,21 +65,21 @@
+ 			   app->Xresource, app->mini_icon);
+ 		else
+ 		    printf("Style\t\"%s\"\tTitleIcon\t%s\n",
+-			   app->name, app->mini_icon);
++			   unicode_to_locale(app->name), app->mini_icon);
+ 	    }
+ 	    if ((app->name && app->icon) && !is_set(NO_ICONS))
+ 		printf("Style\t\"%s\"\tIcon\t%s\n",
+-		       app->name, app->icon);
++		       unicode_to_locale(app->name), app->icon);
+ 	}
+ 	item++;
+     }
+ 
+-    root_name = single_string(root->name);
++    root_name = single_string(unicode_to_locale(root->name));
+     
+     printf("# The menus...\n");
+     if (level)
+ 	printf("AddToMenu\t%s%s\t\"%s\"\tTitle\n",
+-	       menu_name, root_name, root->name);
++	       menu_name, root_name, unicode_to_locale(root->name));
+     
+     item = root->items;
+     while (item->type != 0) {
+@@ -88,9 +88,9 @@
+ 	    char *c_tmp;
+ 	    
+ 	    tmp = (struct group *)item->data;
+-	    c_tmp = single_string(tmp->name);
++	    c_tmp = single_string(unicode_to_locale(tmp->name));
+ 	    printf("AddToMenu\t%s%s\t\"%s\"\tPopup\t%s%s.%s\n",
+-		   menu_name, root_name, tmp->name,
++		   menu_name, root_name, unicode_to_locale(tmp->name),
+ 		   menu_name, root_name, c_tmp);
+ 	    free(c_tmp);
+ 	} else if (item->type == ITEM_APP) {
+@@ -102,10 +102,10 @@
+ 	    if (app->name && app->exec) {
+ 		if ((app->mini_icon != NULL) && !is_set(NO_MINI_ICONS))
+ 		    printf("AddToMenu\t%s%s\t\"%s %%%s%%\"\tExec\t%s\n",
+-			   menu_name, root_name, app->name, app->mini_icon, app->exec);
++			   menu_name, root_name, unicode_to_locale(app->name), app->mini_icon, app->exec);
+ 		else
+ 		    printf("AddToMenu\t%s%s\t\"%s\"\tExec\t%s\n",
+-			   menu_name, root_name, app->name, app->exec);
++			   menu_name, root_name, unicode_to_locale(app->name), app->exec);
+ 	    }
+ 	}
+ 	item++;
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/icewm.c wmconfig-0.9.10/icewm.c
+--- wmconfig-0.9.10.orig/icewm.c	Thu Feb 11 00:57:12 1999
++++ wmconfig-0.9.10/icewm.c	Sat Jul 28 16:52:54 2001
+@@ -50,7 +50,7 @@
+ 
+     if (level > 0) {
+         for (sp = 1; sp < level; sp++) putchar('\t');
+-        printf("menu \"%s\" folder {\n", (level == 0) ? "Programs" : root->name);
++        printf("menu \"%s\" folder {\n", (level == 0) ? "Programs" : unicode_to_locale(root->name));
+     }
+ 
+     item = root->items;
+@@ -66,7 +66,7 @@
+                 for (sp = 1; sp <= level; sp++)
+ 		    putchar('\t');
+ 		printf("prog \"%s\" %s ",
+-                       app->name, app->__package);
++                       unicode_to_locale(app->name), app->__package);
+ 					
+                 /* this removes ending '&' that should not be there */
+                 {
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/mwm.c wmconfig-0.9.10/mwm.c
+--- wmconfig-0.9.10.orig/mwm.c	Tue Jul 11 00:43:50 2000
++++ wmconfig-0.9.10/mwm.c	Sat Jul 28 16:54:00 2001
+@@ -40,7 +40,7 @@
+ 	return;
+     
+     printf("Menu %s\n{\n\t@%s\tf.title\n",
+-	   root->name, root->name);
++	   unicode_to_locale(root->name), unicode_to_locale(root->name));
+     
+     item = root->items;
+     while (item->type != 0) {
+@@ -49,7 +49,7 @@
+ 
+ 	    tmp = (struct group *)item->data;
+ 	    printf("\t\"%s\"\tf.menu %s\n",
+-		   tmp->name, tmp->name);
++		   unicode_to_locale(tmp->name), unicode_to_locale(tmp->name));
+ 	}
+ 	item++;
+     }
+@@ -62,7 +62,7 @@
+ 	    app = (struct package *)item->data;
+ 	    if (app->name && app->exec) {
+ 		printf("\t\"%s\"\tf.exec \"%s\"\n",
+-		       app->name, app->exec);
++		       unicode_to_locale(app->name), app->exec);
+ 	    }
+ 	}
+ 	item++;
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/prototypes.h wmconfig-0.9.10/prototypes.h
+--- wmconfig-0.9.10.orig/prototypes.h	Tue Jul 11 00:43:50 2000
++++ wmconfig-0.9.10/prototypes.h	Sat Jul 28 15:53:25 2001
+@@ -85,5 +85,8 @@
+ /* util.c */
+ char *single_string(const char *group_string);
+ 
++/* unicode.c */
++const char *unicode_to_locale(const char *str);
++
+ #endif /* _PROTOTYPES_H */
+      
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/unicode.c wmconfig-0.9.10/unicode.c
+--- wmconfig-0.9.10.orig/unicode.c	Thu Jan  1 01:00:00 1970
++++ wmconfig-0.9.10/unicode.c	Sat Jul 28 16:40:19 2001
+@@ -0,0 +1,114 @@
++
++/*
++ * (c) 2001 Jacek Konieczny <jajcus@pld.org.pl>
++ * 
++ * Function converting string from UTF-8 to local charset (if conversion is possible)
++ * for wmconfig package
++ *
++ * the function uses static buffer as nothing more is required 
++ * (strings are printf'ed just after conversion)
++ *
++ * when conversion fails it is assumed the string is already in local charset 
++ */ 
++
++#include <stdio.h>
++#include <iconv.h>
++#include <locale.h>
++#include <langinfo.h>
++#include <errno.h>
++#include "config.h"
++#include "prototypes.h"
++
++static iconv_t ic=0;
++static char *buffer=NULL;
++static int allocated;
++
++static int init_conversion(){
++char *codeset;
++
++	codeset=nl_langinfo(CODESET);
++	if (codeset==NULL){
++		ic=(iconv_t)-1;
++		return -1;
++	};
++	ic=iconv_open(codeset,"utf-8");
++	if (ic==(iconv_t)-1) return -1;
++	buffer=(char *)malloc(32);
++	if (buffer==NULL){
++		fprintf(stderr,"Memory allocation error\n");
++		exit(1);
++	}
++	allocated=32;
++	return 0;
++}
++
++const char *unicode_to_locale(const char *str){
++size_t nconv,insize,outsize;
++const char *inptr;
++char *outptr;
++int outidx;
++int bad;
++	
++	if (ic==(iconv_t)-1) return str;
++	if (buffer==NULL) init_conversion();
++	if (ic==(iconv_t)-1) return str;
++
++	insize=strlen(str);
++	outsize=allocated-1;
++	inptr=str; outptr=buffer;
++	bad=0;
++	while(insize>0){
++		nconv=iconv(ic,(char **)&inptr,&insize,&outptr,&outsize);
++		if (nconv==(size_t)-1){
++			if (errno==EILSEQ || errno==EINVAL){
++				bad=1;
++				break;
++			}
++			else if (errno==E2BIG){
++				outidx=outptr-buffer;
++				allocated+=16;
++				buffer=(char *)realloc(buffer,allocated);
++				if (buffer==NULL){
++					fprintf(stderr,"Memory allocation error\n");
++					exit(1);
++				}
++				outptr=buffer+outidx;
++				outsize+=16;
++			}
++			else if (errno==EBADF) return str;
++			else {
++				perror("iconv");
++				exit(1);
++			}
++		}
++	}
++	
++	/* after all input characters are processed we must return 
++	 * to initial state, even if conversion was not successful */
++	while(1){
++		nconv=iconv(ic,NULL,&insize,&outptr,&outsize);
++		if (nconv!=(size_t)-1){
++			if (bad) break;
++			buffer[allocated-1-outsize]=0;
++			return buffer;
++		}
++		if (errno==EILSEQ || errno==EBADF || errno==EINVAL) break;
++		else if (errno==E2BIG){
++			outidx=outptr-buffer;
++			allocated+=16;
++			buffer=(char *)realloc(buffer,allocated);
++			if (buffer==NULL){
++				fprintf(stderr,"Memory allocation error\n");
++				exit(1);
++			}
++			outptr=buffer+outidx;
++			outsize+=16;
++		}
++		else{
++			perror("iconv");
++			exit(1);
++		}
++	}
++	return str;
++}
++
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/wmaker.c wmconfig-0.9.10/wmaker.c
+--- wmconfig-0.9.10.orig/wmaker.c	Tue Jul 11 00:43:50 2000
++++ wmconfig-0.9.10/wmaker.c	Sat Jul 28 16:44:09 2001
+@@ -40,7 +40,7 @@
+         for (i=0; i<level; i++) {
+ 	    printf("\t");
+ 	}
+-	printf("\"%s\" MENU\n", root->name);
++	printf("\"%s\" MENU\n", unicode_to_locale(root->name));
+     }
+     item = root->items;
+     while (item->type != 0) {
+@@ -54,7 +54,7 @@
+ 	      for (i=0; i<level; i++) {
+ 		printf("\t");
+ 	      }
+-	      printf("\t\"%s\" EXEC %s\n", app->name, app->exec);
++	      printf("\t\"%s\" EXEC %s\n", unicode_to_locale(app->name), app->exec);
+ 	    }
+ 	}
+ 	item++;
+@@ -63,7 +63,7 @@
+         for (i=0; i<level; i++) {
+ 	    printf("\t");
+ 	}
+-	printf("\"%s\" END\n", root->name);
++	printf("\"%s\" END\n", unicode_to_locale(root->name));
+     }
+ }
+ 
+diff -durN --exclude Makefile.in --exclude Makefile --exclude aclocal.m4 --exclude config* --exclude *stamp* --exclude *.spec wmconfig-0.9.10.orig/wmconfig.c wmconfig-0.9.10/wmconfig.c
+--- wmconfig-0.9.10.orig/wmconfig.c	Sat Jul 28 15:41:40 2001
++++ wmconfig-0.9.10/wmconfig.c	Sat Jul 28 16:26:44 2001
+@@ -37,6 +37,7 @@
+ #include <ctype.h>
+ #include <dirent.h>
+ #include <pwd.h>
++#include <locale.h>
+ 
+ /* static vars... */
+ static const char *ProgName = NULL;
+@@ -337,6 +338,8 @@
+     int ret;
+     char *home;
+     int have_files = 0;
++   
++    setlocale(LC_ALL,"");
+     
+     ProgName = argv[0];
+     
