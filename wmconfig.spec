@@ -8,20 +8,20 @@ Summary(fr):	Configurateur de gestionnaires de fenêtres
 Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
-Version:	0.9.9
-Release:	5
+Version:	0.9.10
+Release:	4
 License:	GPL
 Group:		X11/Window Managers/Tools
 Group(de):	X11/Fenstermanager/Werkzeuge
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
 Patch0:		%{name}-GNOME_path.patch
-Patch1:		%{name}-man.patch.gz
-Patch2:		%{name}-config.patch
-Patch3:		%{name}-input.patch
-Patch4:		%{name}-gnomelibs.patch
-Patch5:		%{name}-pre-post.patch
-Patch6:		%{name}-applnk.patch
+Patch1:		%{name}-config.patch
+Patch2:		%{name}-input.patch
+Patch3:		%{name}-gnomelibs.patch
+Patch4:		%{name}-applnk.patch
+BuildRequires:	autoconf
+BuildRequires:	automake
 BuildRequires:	glib-devel
 %{!?_without_gnome:BuildRequires:	gnome-libs-static}
 BuildRequires:	zlib-devel
@@ -48,12 +48,14 @@ WindowMaker.
 %patch0 -p0
 %patch1 -p0
 %patch2 -p0
-%patch3 -p0
+%patch3 -p1
 %patch4 -p1
-%patch5 -p1
-%patch6 -p1
 
 %build
+rm -f acinclude.m4
+aclocal
+autoconf
+automake -a -c
 LDFLAGS="%{rpmldflags} -L%{_libdir}"
 %configure \
 	%{!?_without_gnome:--enable-gnome}
