@@ -1,0 +1,17 @@
+wmconfig from PLD is slightly "improved".
+When wmconfig produce output for blackbox, at the end
+file $MY_BLACKBOX_MENU is included, eg.
+MY_BLACKBOX_MENU=/etc/X11/blackbox/appendix
+
+and that file contains
+	[submenu] (Style) {Which style?}
+		[stylesdir] (/usr/X11R6/share/blackbox/styles)
+	[end]
+	[config] (Config Options)
+	[reconfig] (Reconfigure)
+	[restart] (Restart)
+	[exit] (Exit)
+
+Mustn't be (or even shouldn't be) "[end]" at the end of this this file,
+because "[end]" is produced by wmconfig.
+
