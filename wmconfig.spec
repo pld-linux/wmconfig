@@ -80,7 +80,7 @@ IceWM, KDE, WindowMaker.
 
 %build
 rm -f acinclude.m4 missing
-aclocal
+%{__aclocal}
 %{__autoconf}
 %{__automake}
 LDFLAGS="%{rpmldflags} -L%{_libdir}"
