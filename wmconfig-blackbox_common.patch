@@ -13,22 +13,20 @@
      if (root == (struct group *)NULL)
          return;
  
-@@ -95,7 +99,30 @@
+@@ -95,7 +99,28 @@
      }
      if (level > 0) 
          for (sp = 0; sp < level; sp++) putchar('\t');
 -    
 +/*
-+ *	This insert file with common blackbox menu entries
++ *	This inserts file with common blackbox menu entries
 + */
 +    if (level == 0) {
 +		dl = strlen(getenv("LANG")) + strlen("/etc/X11/blackbox/bottom_part.");
-+		filename = (char *)calloc(1, dl + 1);
++		filename = (char *)malloc(dl + 1);
 +		if (filename != NULL) {
-+			strncpy(filename, "/etc/X11/blackbox/bottom_part.",
-+				strlen("/etc/X11/blackbox/bottom_part."));
-+			strncat(filename, getenv("LANG"), strlen(getenv("LANG")));
-+			filename[dl] = '\0';
++			strcpy(filename, "/etc/X11/blackbox/bottom_part.");
++			strcat(filename, getenv("LANG"));
 +			f = fopen(filename, "r");
 +			if (f == NULL) f = fopen("/etc/X11/blackbox/bottom_part","r");
 +			if (f != NULL) {

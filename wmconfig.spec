@@ -9,7 +9,7 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.10
-Release:	9
+Release:	10
 License:	GPL
 Group:		X11/Window Managers/Tools
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
@@ -43,9 +43,8 @@ IceWM, KDE, WindowMaker.
 
 %description -l pl
 Ten program u³atwia konfigurowanie menu w ró¿nych zarz±dcach okien
-dostêpnych dla systemu X11. W tej chwili jest wspierany przez
-nastêpuj±ce programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i
-WindowMaker.
+dostêpnych dla systemu X11. W tej chwili wspiera nastêpuj±ce programy:
+FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 
 %prep
 %setup -q
