@@ -5,7 +5,7 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.3
-Release:	2
+Release:	1
 Copyright:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
@@ -57,6 +57,12 @@ rm -rf $RPM_BUILD_ROOT
 /usr/X11R6/man/man1/wmconfig.1.*
 
 %changelog
+* Mon Apr 19 1999 Piotr Czerwiñski <pius@pld.org.pl>
+  [0.9.3-1]
+- updated to 0.9.3,
+- added wmconfig-man.patch,
+- recompiled on new rpm.
+
 * Wed Mar 31 1999 Tomasz K³oczko <kloczek@rudy.mif.pg.gda.pl>
   [0.9.2-2]
 - fixed patch to GNOME application description (wmconfig-GNOME_patch.patch).
