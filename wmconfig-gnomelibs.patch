@@ -1,0 +1,12 @@
+diff -ur wmconfig-0.9.7.otig/configure.in wmconfig-0.9.7/configure.in
+--- wmconfig-0.9.7.otig/configure.in	Sat Aug 28 00:37:57 1999
++++ wmconfig-0.9.7/configure.in	Tue Jun 20 02:09:51 2000
+@@ -24,7 +24,7 @@
+ 	    have_gnome=true
+ 	    AC_DEFINE(HAVE_GNOME)
+ 	    GNOME_INCS="`gnome-config --cflags gnome`"
+-	    GNOME_LIBS="`gnome-config --libs-only-l gnome`"
++	    GNOME_LIBS="/usr/X11R6/lib/libgnome.a -lglib"
+ 	    AC_SUBST(GNOME_INCS)
+ 	    AC_SUBST(GNOME_LIBS)
+ 	    ;;
