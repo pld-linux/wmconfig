@@ -1,0 +1,11 @@
+--- wmconfig.c~	Wed Mar 31 23:51:00 1999
++++ wmconfig.c	Tue Jun 29 12:43:57 1999
+@@ -23,6 +23,8 @@
+  * WM config program
+  */
+ 
++#include <config.h>
++
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
