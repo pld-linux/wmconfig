@@ -1,6 +1,6 @@
 #
 # Conditional build:
-# bcond_off_gnome - without GNOME support
+# _without_gnome - without GNOME support
 #
 Summary:	Window Manager Configurator
 Summary(de):	Window Manager Configurator 
@@ -22,7 +22,7 @@ Patch4:		wmconfig-gnomelibs.patch
 Patch5:		wmconfig-pre-post.patch
 Patch6:		wmconfig-applnk.patch
 BuildRequires:	glib-devel
-%{!?bcond_off_gnome:BuildRequires:	gnome-libs-static}
+%{!?_without_gnome:BuildRequires:	gnome-libs-static}
 BuildRequires:	zlib-devel
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
@@ -55,7 +55,7 @@ WindowMaker.
 %build
 LDFLAGS="-s -L%{_libdir}"; export LDFLAGS
 %configure \
-	%{!?bcond_off_gnome:--enable-gnome}
+	%{!?_without_gnome:--enable-gnome}
 %{__make} 
 
 %install
