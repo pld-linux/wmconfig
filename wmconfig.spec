@@ -33,7 +33,7 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 
 %build
 CFLAGS="$RPM_OPT_FLAGS" LDFLAGS="-s" \
-./configure \
+./configure %{_target} \
 	--prefix=/usr/X11R6
 make 
 
