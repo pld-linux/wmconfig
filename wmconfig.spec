@@ -40,6 +40,7 @@ BuildRequires:	popt-static
 Requires:	applnk
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
+%define		specflags_ia32	"-fomit-frame-pointer"
 
 %description
 This is a program that will generate menu configurations for different
