@@ -9,7 +9,7 @@ Release:	4
 License:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
-Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
+Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
 Patch0:		wmconfig-GNOME_path.patch
 Patch1:		wmconfig-man.patch.gz
 Patch2:		wmconfig-config.patch
@@ -24,15 +24,16 @@ BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
 This is a program that will generate menu configurations for different
-window managers available for the X11 system. It is an attempt to gain some
-form of abstractization of the menu configuration across some window
-managers. Currently it supports: FVWM2, FVWM95, Afterstep, MWM, IceWM, KDE,
-WindowMaker.
+window managers available for the X11 system. It is an attempt to gain
+some form of abstractization of the menu configuration across some
+window managers. Currently it supports: FVWM2, FVWM95, Afterstep, MWM,
+IceWM, KDE, WindowMaker.
 
 %description -l pl
 Ten program u³atwia konfigurowanie menu w ró¿nych zarz±dcach okien
-dostêpnych dla systemu X11. W tej chwili jest wspierany przez nastêpuj±ce
-programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
+dostêpnych dla systemu X11. W tej chwili jest wspierany przez
+nastêpuj±ce programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i
+WindowMaker.
 
 %prep
 %setup -q
@@ -42,7 +43,7 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 %patch3 -p0
 
 %build
-LDFLAGS="-s -L%{_prefix}/lib"; export LDFLAGS
+LDFLAGS="-s -L%{_libdir}"; export LDFLAGS
 %configure \
 	--enable-gnome
 make 
