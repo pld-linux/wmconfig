@@ -1,11 +1,11 @@
 Summary:     Window Manager Configurator
 Summary(de): Window Manager Configurator 
 Summary(fr): Configurateur de gestionnaires de fenêtres
-Summary(pl): Konfigurator menad¿erów okien
+Summary(pl): Konfigurator zarz±dców okien
 Summary(tr): Pencere denetleyicisi ayarlarý
 Name:        wmconfig
-Version:     0.5
-Release:     3
+Version:     0.9.2
+Release:     1
 Copyright:   GPL
 Group:       X11/Window Managers/Tools
 Group(pl):   X11/Zarz±dcy Okien/Narzêdzia
@@ -20,34 +20,51 @@ Currently it supports: FVWM2, FVWM95, Afterstep, MWM, IceWM, KDE,
 WindowMaker.
 
 %description -l pl
-Ten program u³atwia konfigurowanie menu w ró¿nych menad¿erach okien
+Ten program u³atwia konfigurowanie menu w ró¿nych zarz±dcach okien
 dostêpnych dla systemu X11. W tej chwili jest wspierany przez nastêpuj±ce
 programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 
 %prep
-%setup -q -c 
+%setup -q
 
 %build
-make CFLAGS="$RPM_OPT_FLAGS" LDFLAGS=-s
+CFLAGS="$RPM_OPT_FLAGS" LDFLAGS=-s ./configure \
+	--prefix=/usr/X11R6
+make 
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT/{etc/X11/wmconfig,usr/X11R6/man/man1}
+install -d $RPM_BUILD_ROOT/{etc/X11/wmconfig,usr/X11R6/{bin,man/man1}}
 
-make install TOP_DIR=$RPM_BUILD_ROOT
-mv $RPM_BUILD_ROOT/usr/man/man1/wmconfig.1 $RPM_BUILD_ROOT/usr/X11R6/man/man1
+make DESTDIR=$RPM_BUILD_ROOT install-strip
 
-gzip -9nf $RPM_BUILD_ROOT/usr/X11R6/man/man1/*
+gzip -9nf AUTHORS README TODO ChangeLog \
+	$RPM_BUILD_ROOT/usr/X11R6/man/man1/wmconfig.1
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%attr(755, root, root) %dir /etc/X11/wmconfig
-%attr(755, root, root) /usr/X11R6/bin/*
-%attr(755, root, root) /usr/X11R6/man/man1/*
+%defattr(644,root,root,755)
+%doc {AUTHORS,README,TODO,ChangeLog}.gz
+%dir /etc/X11/wmconfig
+
+%attr(755,root,root) /usr/X11R6/bin/wmconfig
+/usr/X11R6/man/man1/wmconfig.1.*
 
 %changelog
+* Tue Mar 30 1999 Piotr Czerwiñski <pius@pld.org.pl>
+  [0.9.2-1]
+- updated to 0.9.2,
+- removed -c %setup parameter,
+- added using ./configure in %build,
+- simplifications in %install,
+- added using DESTDIR,
+- added full %defattr description in %files,
+- fixed %attr description,
+- added documentation,
+- cosmetic changes.
+
 * Thu Feb 10 1999 Micha³ Kuratczyk <kurkens@polbox.com>
   [0.5-3]
 - added Group(pl)
