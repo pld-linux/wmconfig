@@ -5,7 +5,7 @@ Summary(pl): Konfigurator zarz±dców okien
 Summary(tr): Pencere denetleyicisi ayarlarý
 Name:        wmconfig
 Version:     0.9.2
-Release:     1
+Release:     2
 Copyright:   GPL
 Group:       X11/Window Managers/Tools
 Group(pl):   X11/Zarz±dcy Okien/Narzêdzia
@@ -34,7 +34,7 @@ make
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT/{etc/X11/wmconfig,usr/X11R6/{bin,man/man1}}
+install -d $RPM_BUILD_ROOT/usr/X11R6/{bin,man/man1}
 
 make DESTDIR=$RPM_BUILD_ROOT install-strip
 
@@ -47,12 +47,16 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(644,root,root,755)
 %doc {AUTHORS,README,TODO,ChangeLog}.gz
-%dir /etc/X11/wmconfig
 
 %attr(755,root,root) /usr/X11R6/bin/wmconfig
 /usr/X11R6/man/man1/wmconfig.1.*
 
 %changelog
+* Wed Mar 31 1999 Piotr Czerwiñski <pius@pld.org.pl>
+  [0.9.2-2]
+- removed "%dir /etc/X11/wmconfig" from %files 
+  (it comes with the filesystem package now).
+
 * Tue Mar 30 1999 Piotr Czerwiñski <pius@pld.org.pl>
   [0.9.2-1]
 - updated to 0.9.2,
