@@ -5,7 +5,7 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.5
-Release:	1
+Release:	3
 Copyright:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
