@@ -1,45 +1,10 @@
---- wmconfig-0.9.10/blackbox.c	Mon Mar  4 10:10:53 2002
-+++ wmconfig-0.9.10.new/blackbox.c	Mon Mar  4 10:10:26 2002
-@@ -49,7 +49,11 @@
- {
-     struct item *item;
-     int sp;
--
-+	FILE *f = 0;
-+	char *filename = 0;
-+	char *buf = 0; 
-+	int dl;
-+	
-     if (root == (struct group *)NULL)
-         return;
- 
-@@ -95,7 +99,28 @@
+--- wmconfig-0.9.10/blackbox.c.orig	Sun Apr 14 08:01:44 2002
++++ wmconfig-0.9.10/blackbox.c	Sun Apr 14 08:16:27 2002
+@@ -95,6 +95,7 @@
      }
      if (level > 0) 
          for (sp = 0; sp < level; sp++) putchar('\t');
--    
-+/*
-+ *	This inserts file with common blackbox menu entries
-+ */
-+    if (level == 0) {
-+		dl = strlen(getenv("LANG")) + strlen("/etc/X11/blackbox/bottom_part.");
-+		filename = (char *)malloc(dl + 1);
-+		if (filename != NULL) {
-+			strcpy(filename, "/etc/X11/blackbox/bottom_part.");
-+			strcat(filename, getenv("LANG"));
-+			f = fopen(filename, "r");
-+			if (f == NULL) f = fopen("/etc/X11/blackbox/bottom_part","r");
-+			if (f != NULL) {
-+				buf = (char *)malloc(1024);
-+				if (buf != NULL) {
-+					while (fgets(buf, 1024, f)) printf("%s", buf);
-+					free(buf);
-+				}
-+				fclose(f);
-+			}
-+			free(filename);
-+		}
-+	}
++    if ((level == 0) && getenv("MY_BLACKBOX_MENU")) printf("\t[include] (%s)\n", getenv("MY_BLACKBOX_MENU"));
+     
      printf("[end]\n");
  }
- 
