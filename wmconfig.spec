@@ -42,9 +42,7 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 %patch3 -p0
 
 %build
-CFLAGS="$RPM_OPT_FLAGS" 
-LDFLAGS="-s -L/usr/X11R6/lib"
-export CFLAGS LDFLAGS
+LDFLAGS="-s -L/usr/X11R6/lib"; export LDFLAGS
 %configure \
 	--enable-gnome
 make 
@@ -53,7 +51,7 @@ make
 rm -rf $RPM_BUILD_ROOT
 install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,/etc/X11/wmconfig}
 
-make install-strip DESTDIR=$RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
 
 gzip -9nf AUTHORS README TODO ChangeLog \
 	$RPM_BUILD_ROOT%{_mandir}/man1/wmconfig.1
@@ -65,6 +63,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(644,root,root,755)
 %doc {AUTHORS,README,TODO,ChangeLog}.gz
 %attr(755,root,root) %{_bindir}/wmconfig
-%{_mandir}/man1/wmconfig.1.gz
+%{_mandir}/man1/*
 
 %dir /etc/X11/wmconfig
