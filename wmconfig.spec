@@ -9,18 +9,20 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.10
-Release:	5
+Release:	6
 License:	GPL
 Group:		X11/Window Managers/Tools
 Group(de):	X11/Fenstermanager/Werkzeuge
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source0:	ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
-Patch0:		%{name}-GNOME_path.patch
-Patch1:		%{name}-config.patch
-Patch2:		%{name}-input.patch
-Patch3:		%{name}-gnomelibs.patch
-Patch4:		%{name}-applnk.patch
-Patch5:		%{name}-unicode.patch
+Patch0:		%{name}-am_ac.patch
+Patch1:		%{name}-GNOME_path.patch
+Patch2:		%{name}-config.patch
+Patch3:		%{name}-input.patch
+Patch4:		%{name}-gnomelibs.patch
+Patch5:		%{name}-applnk.patch
+Patch6:		%{name}-unicode.patch
+Patch7:		%{name}-fvwm2-dynamic_menus.patch
 BuildRequires:	autoconf
 BuildRequires:	automake
 BuildRequires:	glib-devel
@@ -46,15 +48,17 @@ WindowMaker.
 
 %prep
 %setup -q
-%patch0 -p0
+%patch0 -p1
 %patch1 -p0
 %patch2 -p0
-%patch3 -p1
+%patch3 -p0
 %patch4 -p1
 %patch5 -p1
+%patch6 -p1
+%patch7 -p1
 
 %build
-rm -f acinclude.m4
+rm -f acinclude.m4 missing
 aclocal
 autoconf
 automake -a -c
