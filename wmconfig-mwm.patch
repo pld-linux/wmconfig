@@ -1,0 +1,20 @@
+--- mwm.c.orig	Tue Mar 26 02:03:50 2002
++++ mwm.c	Tue Mar 26 02:03:50 2002
+@@ -39,7 +39,7 @@
+     if (root == (struct group *)NULL)
+ 	return;
+     
+-    printf("Menu %s\n{\n\t@%s\tf.title\n",
++    printf("Menu \"%s\"\n{\n\t@\"%s\"\tf.title\n",
+ 	   unicode_to_locale(root->name), unicode_to_locale(root->name));
+     
+     item = root->items;
+@@ -48,7 +48,7 @@
+ 	    struct group *tmp;
+ 
+ 	    tmp = (struct group *)item->data;
+-	    printf("\t\"%s\"\tf.menu %s\n",
++	    printf("\t\"%s\"\tf.menu \"%s\"\n",
+ 		   unicode_to_locale(tmp->name), unicode_to_locale(tmp->name));
+ 	}
+ 	item++;
