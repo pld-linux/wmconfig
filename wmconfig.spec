@@ -4,8 +4,10 @@
 #
 Summary:	Window Manager Configurator
 Summary(de):	Window Manager Configurator
+Summary(es):	Configurador de Administradores de ventanas
 Summary(fr):	Configurateur de gestionnaires de fenêtres
 Summary(pl):	Konfigurator zarz±dców okien
+Summary(pt_BR):	Configurador de gerenciadores de janelas
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.10
@@ -41,10 +43,24 @@ some form of abstractization of the menu configuration across some
 window managers. Currently it supports: FVWM2, FVWM95, Afterstep, MWM,
 IceWM, KDE, WindowMaker.
 
+%description -l es
+Este es un programa que crea configuraciones de menú para diferentes
+administradores de ventana disponibles para el sistema X11. Es un
+intento de abstraer una configuración única entre estos diferentes
+administradores. Actualmente soporta: FVWM2, FVWM95, Afterstep, MWM,
+IceWM, KDE, WindowMaker.
+
 %description -l pl
 Ten program u³atwia konfigurowanie menu w ró¿nych zarz±dcach okien
 dostêpnych dla systemu X11. W tej chwili wspiera nastêpuj±ce programy:
-FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
+FVWM2, FVWM95, Afterstep, MWM, IceWM, KDE, WindowMaker.
+
+%description -l pt_BR
+Este é um programa que gera configurações de menu para diferentes
+gerenciadores de janela disponíveis para o sistema X11. É uma
+tentativa de abstrair uma configuração única entre esses diferentes
+gerenciadores. Atualmente suporta: FVWM2, FVWM95, Afterstep, MWM,
+IceWM, KDE, WindowMaker.
 
 %prep
 %setup -q
