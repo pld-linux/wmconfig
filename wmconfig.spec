@@ -5,8 +5,8 @@ Summary(pl):	Konfigurator zarz±dców okien
 Summary(tr):	Pencere denetleyicisi ayarlarý
 Name:		wmconfig
 Version:	0.9.7
-Release:	3
-Copyright:	GPL
+Release:	4
+License:	GPL
 Group:		X11/Window Managers/Tools
 Group(pl):	X11/Zarz±dcy Okien/Narzêdzia
 Source:		ftp://ftp.redhat.com/home/gafton/wmconfig/%{name}-%{version}.tar.gz
@@ -23,10 +23,10 @@ Buildroot:	/tmp/%{name}-%{version}-root
 %define		_mandir		%{_prefix}/man
 
 %description
-This is a program that will generate menu configurations for different 
+This is a program that will generate menu configurations for different
 window managers available for the X11 system. It is an attempt to gain some
-form of abstractization of the menu configuration across some window managers.
-Currently it supports: FVWM2, FVWM95, Afterstep, MWM, IceWM, KDE,
+form of abstractization of the menu configuration across some window
+managers. Currently it supports: FVWM2, FVWM95, Afterstep, MWM, IceWM, KDE,
 WindowMaker.
 
 %description -l pl
@@ -42,14 +42,14 @@ programy: FVWM2, FVWM95, AfterStep, MWM, IceWM, KDE i WindowMaker.
 %patch3 -p0
 
 %build
-LDFLAGS="-s -L/usr/X11R6/lib"; export LDFLAGS
+LDFLAGS="-s -L%{_prefix}/lib"; export LDFLAGS
 %configure \
 	--enable-gnome
 make 
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,/etc/X11/wmconfig}
+install -d $RPM_BUILD_ROOT{%{_bindir},%{_mandir}/man1,%{_sysconfdir}/X11/wmconfig}
 
 make install DESTDIR=$RPM_BUILD_ROOT
 
@@ -65,4 +65,4 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,root,root) %{_bindir}/wmconfig
 %{_mandir}/man1/*
 
-%dir /etc/X11/wmconfig
+%dir %{_sysconfdir}/X11/wmconfig
