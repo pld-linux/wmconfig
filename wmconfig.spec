@@ -6,6 +6,7 @@ Release:	1
 License:	GPL
 Group:		X11/Window Managers
 Source0:	http://www.arrishq.net/downloads/%{name}-%{version}.tar.bz2
+# Source0-md5:	60712272d1b31c871916459a10e4ffbc
 URL:		http://www.arrishq.net
 BuildRoot:      %{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
