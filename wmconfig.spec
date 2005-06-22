@@ -7,7 +7,10 @@ License:	GPL
 Group:		X11/Window Managers
 Source0:	http://www.arrishq.net/downloads/%{name}-%{version}.tar.bz2
 # Source0-md5:	60712272d1b31c871916459a10e4ffbc
-URL:		http://www.arrishq.net
+URL:		http://www.arrishq.net/
+BuildRequires:	autoconf
+BuildRequires:	automake
+BuildRequires:	libtool
 BuildRoot:      %{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
@@ -48,10 +51,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(644,root,root,755)
 %doc AUTHORS ChangeLog README
-
 %dir %{_sysconfdir}/%{name}
 %config(noreplace) %verify(not size mtime md5) %{_sysconfdir}/%{name}/*
-
 %{_mandir}/man1/*
-
 %attr(755,root,root) %{_bindir}/*
