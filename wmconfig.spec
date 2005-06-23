@@ -11,20 +11,20 @@ URL:		http://www.arrishq.net/
 BuildRequires:	autoconf
 BuildRequires:	automake
 BuildRequires:	libtool
-BuildRoot:      %{tmpdir}/%{name}-%{version}-root-%(id -u -n)
+BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
 
 %description
 Wmconfig is a menu generation tool for various window managers and
-desktop environments. See "wmconfig --help" for a list of 
-supported window managers. It reads configuration files and outputs 
-the menu file to stdout or - if supported - to files.
+desktop environments. See "wmconfig --help" for a list of supported
+window managers. It reads configuration files and outputs the menu
+file to stdout or - if supported - to files.
 
 %description -l pl
 Wmconfig jest narzêdziem do generowania menu dla ró¿nych zarz±dców
-okien i ¶rodowisk. Aby zobaczyæ listê obs³ugiwanych managerów 
-wykonaj polecenie "wmconfig --help". Wmconfig czyta pliki
-konfiguracyjne i wy¶wietla menu na ekranie lub (je¶li jest to
-obs³ugiwane) skierowuje je do pliku.
+okien i ¶rodowisk. Aby zobaczyæ listê obs³ugiwanych managerów wykonaj
+polecenie "wmconfig --help". Wmconfig czyta pliki konfiguracyjne i
+wy¶wietla menu na ekranie lub (je¶li jest to obs³ugiwane) skierowuje
+je do pliku.
 
 %prep
 %setup -q
@@ -42,6 +42,7 @@ obs³ugiwane) skierowuje je do pliku.
         LDFLAGS="%{rpmldflags}"
 
 %install
+rm -rf $RPM_BUILD_ROOT
 %{__make} install \
 	DESTDIR=$RPM_BUILD_ROOT
 
@@ -52,6 +53,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(644,root,root,755)
 %doc AUTHORS ChangeLog README
 %dir %{_sysconfdir}/%{name}
-%config(noreplace) %verify(not size mtime md5) %{_sysconfdir}/%{name}/*
+%config(noreplace) %verify(not md5 mtime size) %{_sysconfdir}/%{name}/*
 %{_mandir}/man1/*
 %attr(755,root,root) %{_bindir}/*
