@@ -21,10 +21,10 @@ file to stdout or - if supported - to files.
 
 %description -l pl
 Wmconfig jest narzêdziem do generowania menu dla ró¿nych zarz±dców
-okien i ¶rodowisk. Aby zobaczyæ listê obs³ugiwanych managerów wykonaj
-polecenie "wmconfig --help". Wmconfig czyta pliki konfiguracyjne i
-wy¶wietla menu na ekranie lub (je¶li jest to obs³ugiwane) skierowuje
-je do pliku.
+okien i ¶rodowisk. Aby zobaczyæ listê obs³ugiwanych zarz±dców okien
+nale¿y wydaæ polecenie "wmconfig --help". Wmconfig czyta pliki
+konfiguracyjne i wy¶wietla menu na ekranie lub (je¶li jest to
+obs³ugiwane) zapisuje menu do pliku.
 
 %prep
 %setup -q
