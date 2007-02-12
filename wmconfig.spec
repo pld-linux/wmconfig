@@ -1,5 +1,5 @@
 Summary:	Menu generation tool
-Summary(pl):	Narzêdzie do generowania menu
+Summary(pl.UTF-8):   NarzÄ™dzie do generowania menu
 Name:		wmconfig
 Version:	1.2.4
 Release:	1
@@ -19,12 +19,12 @@ desktop environments. See "wmconfig --help" for a list of supported
 window managers. It reads configuration files and outputs the menu
 file to stdout or - if supported - to files.
 
-%description -l pl
-Wmconfig jest narzêdziem do generowania menu dla ró¿nych zarz±dców
-okien i ¶rodowisk. Aby zobaczyæ listê obs³ugiwanych zarz±dców okien
-nale¿y wydaæ polecenie "wmconfig --help". Wmconfig czyta pliki
-konfiguracyjne i wy¶wietla menu na ekranie lub (je¶li jest to
-obs³ugiwane) zapisuje menu do pliku.
+%description -l pl.UTF-8
+Wmconfig jest narzÄ™dziem do generowania menu dla rÃ³Å¼nych zarzÄ…dcÃ³w
+okien i Å›rodowisk. Aby zobaczyÄ‡ listÄ™ obsÅ‚ugiwanych zarzÄ…dcÃ³w okien
+naleÅ¼y wydaÄ‡ polecenie "wmconfig --help". Wmconfig czyta pliki
+konfiguracyjne i wyÅ›wietla menu na ekranie lub (jeÅ›li jest to
+obsÅ‚ugiwane) zapisuje menu do pliku.
 
 %prep
 %setup -q
