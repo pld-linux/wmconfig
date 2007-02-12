@@ -1,5 +1,5 @@
 Summary:	Menu generation tool
-Summary(pl.UTF-8):   Narzędzie do generowania menu
+Summary(pl.UTF-8):	Narzędzie do generowania menu
 Name:		wmconfig
 Version:	1.2.4
 Release:	1
