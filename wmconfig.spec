@@ -1,12 +1,12 @@
 Summary:	Menu generation tool
 Summary(pl.UTF-8):	Narzędzie do generowania menu
 Name:		wmconfig
-Version:	1.2.4
+Version:	1.3.4
 Release:	1
 License:	GPL
 Group:		X11/Window Managers
-Source0:	http://www.arrishq.net/downloads/%{name}-%{version}.tar.bz2
-# Source0-md5:	60712272d1b31c871916459a10e4ffbc
+Source0:	http://www.arrishq.net/files/%{name}-%{version}.tar.bz2
+# Source0-md5:	b9e3fd253ec5bec412222b6f67cc62f1
 URL:		http://www.arrishq.net/
 BuildRequires:	autoconf
 BuildRequires:	automake
